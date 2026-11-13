@@ -1,0 +1,569 @@
+<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="color-scheme" content="light dark"><title>Аренда</title><script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>:root{--bg:#F1F2EE;--card:#fff;--fill:#EBEEE9;--ink:#1F2B28;--mu:#667470;--ln:#E2E6E0;--track:#D9DED8;--pine:#2F5D50;--on:#fff;--tint:#DDE9E3;--go:#3A8560;--nav:rgba(255,255,255,.9);
+--ok:#4E9B71;--okb:#DDEFE4;--okt:#2A6847;--wa:#D9A23A;--wab:#F8ECCB;--wat:#765210;--er:#D8695A;--erb:#F8DDD8;--ert:#8F2F24;--dr:#A8392E;--bl:#4F83B3;--blb:#DCE9F4;--blt:#2F5F8A;--nb:#E9ECE6;--nt:#5A6662;
+--sh:0 10px 32px rgba(31,43,40,.16);color-scheme:light}
+:root[data-theme=dark]{--bg:#121A18;--card:#1B2624;--fill:#25312E;--ink:#ECF1EE;--mu:#9AA8A3;--ln:#2B3733;--track:#33413D;--pine:#86C5AE;--on:#10201A;--tint:#243832;--go:#5DB48A;--nav:rgba(27,38,36,.9);
+--ok:#6BBE8E;--okb:#223A2E;--okt:#9CDDB8;--wa:#E3B34F;--wab:#3C3319;--wat:#EBCB82;--er:#E58A7C;--erb:#432622;--ert:#F2B3A9;--dr:#E27263;--bl:#7FAFDA;--blb:#223446;--blt:#A5C9EA;--nb:#2A3532;--nt:#A9B6B1;
+--sh:0 10px 32px rgba(0,0,0,.45);color-scheme:dark}
+.t-ok{--tc:var(--ok);--tb:var(--okb);--tt:var(--okt)}.t-wa{--tc:var(--wa);--tb:var(--wab);--tt:var(--wat)}.t-er{--tc:var(--er);--tb:var(--erb);--tt:var(--ert)}
+.t-dr{--tc:var(--dr);--tb:var(--erb);--tt:var(--ert)}.t-bl{--tc:var(--bl);--tb:var(--blb);--tt:var(--blt)}.t-n{--tc:var(--mu);--tb:var(--nb);--tt:var(--nt)}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 ui-rounded,"SF Pro Rounded",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-variant-numeric:tabular-nums;letter-spacing:.005em}
+button,input,select,textarea{font:inherit;color:inherit}
+#app{max-width:560px;margin:0 auto;padding-bottom:128px;min-height:100vh}
+#app.fw{animation:fw .2s ease-out}@keyframes fw{from{opacity:.0;transform:translateX(14px)}}
+#app.bw{animation:bw .2s ease-out}@keyframes bw{from{opacity:0;transform:translateX(-14px)}}
+.ic{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}.ic.s{width:20px;height:20px}.ic.l{width:30px;height:30px}
+a{color:var(--pine)}
+.mu{color:var(--mu)}.sm{font-size:13px;line-height:1.35}
+/* headings */
+.hd{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;padding:22px 20px 10px}
+.hd h1{margin:0;font-size:30px;line-height:1.1;font-weight:750;letter-spacing:-.02em}.hd small{display:block;color:var(--mu);font-size:14px;margin-bottom:4px}
+h2.sec{margin:26px 20px 8px;font-size:18px;line-height:1.2;font-weight:700;letter-spacing:-.01em;display:flex;align-items:center;gap:8px}h2.sec.t-er{color:var(--ert)}
+h3{margin:22px 4px 4px;font-size:17px;font-weight:700}
+.ib{width:46px;height:46px;border-radius:50%;border:0;background:var(--card);color:var(--ink);display:grid;place-items:center;flex:none;cursor:pointer}
+.ib:active,.row:active,.tb:active,.btn:active,.wk button:active{transform:scale(.97)}
+.back{display:flex;align-items:center;gap:6px;border:0;background:none;color:var(--pine);font-weight:650;font-size:16px;padding:18px 16px 0;min-height:48px}
+/* hero on the home screen */
+.hero{margin:6px 16px 0;background:var(--card);border-radius:28px;overflow:hidden}
+.hh{display:flex;align-items:center;gap:12px;width:100%;border:0;background:none;color:inherit;font:inherit;text-align:left;padding:18px 16px 18px 20px;cursor:pointer}.hh:active{background:var(--fill)}
+.hh .tx{flex:1;min-width:0}.hh .ht{display:block;font-size:23px;line-height:1.2;font-weight:750;letter-spacing:-.02em}.hh .hs{display:block;margin-top:4px;color:var(--mu);font-size:14px}
+.hh .chev{width:40px;height:40px;border-radius:14px;background:var(--tint);color:var(--pine);display:grid;place-items:center;flex:none;transition:transform .26s}.hero.open .hh .chev{transform:rotate(180deg)}
+.cal{display:grid;grid-template-rows:0fr;transition:grid-template-rows .26s ease}.cal>div{overflow:hidden;min-height:0;visibility:hidden;transition:visibility 0s .26s}
+.hero.open .cal{grid-template-rows:1fr}.hero.open .cal>div{visibility:visible;transition-delay:0s}
+@media (prefers-reduced-motion:reduce){.cal,.hh .chev{transition:none}}
+.wk{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;padding:0 8px 10px}
+.wk button{border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 0 8px;border-radius:16px;font-size:13px;color:var(--mu);cursor:pointer}
+.wk .n{font-size:17px;font-weight:700;color:var(--ink)}.wk .col{width:100%;max-width:24px;height:46px;display:flex;align-items:flex-end}
+.wk .col i{display:block;width:100%;border-radius:8px;background:var(--pine);min-height:6px}.wk .col i.z{background:var(--track);min-height:6px;height:6px}
+.wk .c{height:16px;font-size:12px;font-weight:700;color:var(--ink)}.wk .t{background:var(--tint)}.wk button:disabled{cursor:default}
+.stt{display:grid;grid-template-columns:repeat(2,1fr);background:var(--card);border-radius:22px;margin:4px 16px 8px}
+.stt div{padding:14px 8px 12px;text-align:center}.stt div+div{border-left:1px solid var(--ln)}.stt b{display:block;font-size:24px;line-height:1.1;font-weight:750}.stt span{font-size:13px;color:var(--mu)}
+.bdg{min-width:28px;height:28px;padding:0 8px;border-radius:14px;background:var(--dr);color:var(--on);display:inline-grid;place-items:center;font-size:15px;font-weight:750;line-height:1;flex:none}
+/* lists */
+.grp{background:var(--card);border-radius:24px;margin:6px 16px;overflow:hidden}
+.row{display:flex;align-items:center;gap:14px;padding:13px 16px;width:100%;min-height:68px;border:0;background:none;text-align:left;position:relative;cursor:pointer;color:inherit}
+.row+.row::before{content:"";position:absolute;top:0;left:74px;right:16px;height:1px;background:var(--ln)}
+.row.nl+.row::before,.row.nl::before{left:16px}
+.row .tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}.row .tx b{font-size:17px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.row .tx span{font-size:14px;color:var(--mu);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .rt{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex:none}.row .rt b{font-size:16px;font-weight:700}
+.row .gl{width:44px;height:44px;border-radius:14px;background:var(--tb,var(--tint));color:var(--tt,var(--pine));display:grid;place-items:center;flex:none}
+.row.dn .tx b{color:var(--er)}.row.wr .tx span{white-space:normal}.row.wr{align-items:flex-start}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border-radius:99px;font-size:12px;line-height:1;font-weight:650;background:var(--tb,var(--nb));color:var(--tt,var(--nt));white-space:nowrap}
+.card{background:var(--card);border-radius:24px;margin:8px 16px;padding:18px}
+.card.tint{background:var(--tint)}.card.t-er{background:var(--erb);color:var(--ert)}.card.t-wa{background:var(--wab);color:var(--wat)}.card.t-ok{background:var(--okb);color:var(--okt)}
+.kv{display:flex;justify-content:space-between;gap:16px;padding:9px 0;border-top:1px solid var(--ln);font-size:15px}.kv:first-of-type{border:0}.kv span{color:var(--mu)}.kv b{font-weight:650;white-space:nowrap;text-align:right}
+.big{font-size:34px;line-height:1.1;font-weight:750;letter-spacing:-.025em}.mid{font-size:24px;font-weight:750;letter-spacing:-.02em}
+.note{display:flex;gap:12px;align-items:flex-start;margin:10px 16px;padding:14px 16px;border-radius:18px;background:var(--tb);color:var(--tt);font-size:15px}
+.note b{font-weight:700}.note .btn{margin-top:10px}
+.sub{font-size:13px;color:var(--mu);margin:8px 22px 0;line-height:1.4}
+.bars{padding:4px 0}.br{display:grid;grid-template-columns:96px 1fr auto;gap:12px;align-items:center;padding:6px 0;font-size:14px}.br span{color:var(--mu)}.br i{display:block;height:10px;border-radius:5px;background:var(--track);overflow:hidden}.br i u{display:block;height:100%;background:var(--pine);border-radius:5px}.br b{font-weight:650;white-space:nowrap}
+/* buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:50px;padding:0 20px;border-radius:16px;border:0;background:var(--pine);color:var(--on);font-weight:650;font-size:16px;cursor:pointer;text-decoration:none;white-space:nowrap}
+.btn.sec{background:var(--tint);color:var(--pine)}.btn.dng{background:var(--erb);color:var(--ert)}.btn.go{background:var(--go);color:#fff}.btn.blk{display:flex;width:100%}.btn.lg{min-height:62px;font-size:19px;border-radius:20px}.btn.sm{min-height:38px;padding:0 14px;font-size:14px;border-radius:12px}.btn:disabled{opacity:.5}
+.btn.tw{white-space:normal;line-height:1.15;min-height:58px;text-align:left;justify-content:flex-start;padding:0 16px}.btn.tw span{display:flex;flex-direction:column}.btn.tw small{font-size:13px;font-weight:500;opacity:.8}
+.acts{display:flex;gap:10px;flex-wrap:wrap;margin:12px 16px}.acts .btn{flex:1 1 140px}
+.pad{padding:0 20px}
+/* forms */
+.form{padding:0 20px 20px}
+.fld{display:block;margin:16px 0 0}.fld>span{display:block;font-size:14px;font-weight:600;color:var(--mu);margin:0 4px 6px}
+input:not([type=checkbox]):not([type=file]),select,textarea{width:100%;min-height:54px;height:54px;padding:0 16px;border:2px solid transparent;border-radius:16px;background:var(--card);font-size:17px;appearance:none;-webkit-appearance:none;outline:0}
+select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='9' fill='none' stroke='%23778' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M1 1.5l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 16px center;padding-right:44px}
+textarea{min-height:92px;height:auto;padding:14px 16px;resize:none}
+.sh input:not([type=checkbox]),.sh textarea{background:var(--fill)}.sh textarea{font-size:15px}
+input:focus,select:focus,textarea:focus{border-color:var(--pine)}
+.f2{display:grid;grid-template-columns:1fr 1fr;gap:0 12px;align-items:end}
+.seg{display:flex;gap:4px;background:var(--fill);border-radius:16px;padding:4px;margin:8px 16px}.seg.in{margin:0}
+.seg button{flex:1;min-height:42px;border:0;border-radius:12px;background:none;color:var(--mu);font-weight:650;font-size:14px;cursor:pointer;padding:0 4px;white-space:nowrap}.seg button.on{background:var(--card);color:var(--ink);box-shadow:0 1px 4px rgba(0,0,0,.14)}
+.srch{margin:6px 16px 4px;position:relative}.srch input{padding-left:46px!important;background:var(--card)}.srch .ic{position:absolute;left:15px;top:15px;color:var(--mu)}
+.sw{display:flex;align-items:center;gap:14px;padding:14px 16px;cursor:pointer}.sw+.sw{border-top:1px solid var(--ln)}.sw .tx{flex:1}.sw .tx b{display:block;font-weight:650}.sw .tx span{font-size:13px;color:var(--mu);line-height:1.3;display:block}
+.sw input{appearance:none;-webkit-appearance:none;width:52px;height:32px;border-radius:16px;background:var(--track);position:relative;flex:none;margin:0;transition:background .15s;cursor:pointer}
+.sw input::after{content:"";position:absolute;left:3px;top:3px;width:26px;height:26px;border-radius:50%;background:#fff;transition:transform .18s;box-shadow:0 1px 3px rgba(0,0,0,.3)}.sw input:checked{background:var(--go)}.sw input:checked::after{transform:translateX(20px)}
+.pv{background:var(--tint);border-radius:22px;padding:18px;margin:18px 0 6px}.pv .big{color:var(--pine)}.pv .kv{border-color:rgba(47,93,80,.15)}
+.th{position:relative;display:inline-block;margin:8px 10px 0 0}.th img{width:80px;height:80px;object-fit:cover;border-radius:16px;display:block}.th i{position:absolute;top:-8px;right:-8px;background:var(--er);color:#fff;border-radius:50%;width:26px;height:26px;display:grid;place-items:center;font-style:normal;font-size:14px}
+/* the wheel: one segment per weekly payment */
+.wh{display:block;overflow:visible}.wh path,.wh circle{fill:none;stroke-width:var(--w);stroke:var(--track)}
+.wh .p{stroke:var(--pine)}.wh .o{stroke:var(--er)}.wh .x{stroke:var(--wa)}.wh .n{stroke:var(--mu);opacity:.55}
+.wh.rd path,.wh.rd circle{stroke-linecap:round}
+.wh.an path,.wh.an circle{animation:seg .45s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(var(--i)*26ms + .1s)}
+@keyframes seg{from{opacity:0;stroke-width:0}}
+.whw{position:relative;display:grid;place-items:center;flex:none}.whw .in{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;line-height:1.1}
+.whw .in.ini{font-weight:700;font-size:14px;color:var(--ink)}
+.whw .in .k{font-size:44px;font-weight:800;letter-spacing:-.03em}.whw .in small{font-size:15px;color:var(--mu);margin-top:2px}
+.av{width:44px;height:44px;border-radius:50%;background:var(--tb,var(--nb));color:var(--tt,var(--nt));display:grid;place-items:center;font-weight:700;font-size:14px;flex:none}
+/* deal screen */
+.dh{padding:6px 20px 4px}.dh h1{margin:6px 0 2px;font-size:28px;line-height:1.15;font-weight:750;letter-spacing:-.02em}.dh .ph{font-size:19px;font-weight:600}
+.dh .acts{margin:14px 0 0}
+.pg{display:flex;align-items:center;gap:20px}.pg .nx{flex:1;min-width:0}.pg .nx .mu{font-size:14px}
+.per{display:flex;align-items:center;gap:14px;padding:13px 16px;position:relative}.per+.per::before{content:"";position:absolute;top:0;left:58px;right:16px;height:1px;background:var(--ln)}
+.per .dot{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;flex:none;background:var(--track);color:var(--mu);font-size:12px;font-weight:700}
+.per.ok .dot{background:var(--pine);color:var(--on)}.per.er .dot{background:var(--er);color:#fff}
+.per .tx{flex:1;min-width:0}.per .tx b{display:block;font-weight:650}.per .tx span{font-size:13px;color:var(--mu)}.per>b{font-weight:700;white-space:nowrap}
+.per .un{display:inline-block;border:0;background:var(--fill);color:var(--mu);border-radius:10px;padding:6px 12px;font-size:12px;font-weight:650;margin-top:8px;cursor:pointer}.per .tx b{white-space:nowrap}
+/* client screens */
+.cb{margin:16px 16px 0;border-radius:24px;padding:18px 20px;display:flex;align-items:center;gap:14px;background:var(--tb);color:var(--tt);font-size:21px;line-height:1.2;font-weight:750;letter-spacing:-.01em}
+.cb .gl{width:46px;height:46px;border-radius:50%;background:var(--tc);color:#fff;display:grid;place-items:center;flex:none}
+.cw{display:flex;justify-content:center;padding:24px 0 6px}
+.cn{margin:14px 16px 0;background:var(--card);border-radius:24px;padding:20px}.cn .mu{font-size:14px}
+.cn.owe{display:block;width:calc(100% - 32px);border:0;text-align:left;font:inherit;color:inherit;cursor:pointer}.cn.owe:active{transform:scale(.99)}.cn.owe .big{color:var(--ert)}
+.cn .hint,.owb .mu:last-child{display:flex;align-items:center;gap:2px;margin-top:8px;color:var(--pine);font-size:14px;font-weight:650}.owb .mu:last-child{margin-top:2px;color:var(--mu);font-weight:500}
+.owb{display:block;border:0;background:none;padding:0;text-align:left;font:inherit;color:inherit;cursor:pointer}.owb .mid{color:var(--ert)}
+.tl{display:flex;align-items:center;gap:14px;width:100%;min-height:72px;padding:14px 18px;border:0;background:var(--card);border-radius:22px;margin-top:10px;text-align:left;font-size:18px;font-weight:650;cursor:pointer}.tl .gl{width:44px;height:44px;border-radius:14px;background:var(--tint);color:var(--pine);display:grid;place-items:center}.tl>span:not(.gl){flex:1}.tl .ic:last-child{color:var(--mu)}
+.cp{padding:0 16px}
+/* nav */
+nav{position:fixed;left:0;right:0;bottom:0;z-index:20;display:flex;justify-content:center;pointer-events:none;padding:0 12px max(12px,env(safe-area-inset-bottom));transition:transform .2s}
+nav.hid{transform:translateY(140%)}
+nav .bar{pointer-events:auto;display:flex;width:100%;max-width:520px;background:var(--card);background:var(--nav);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border-radius:30px;padding:8px 6px 7px;box-shadow:var(--sh),0 0 0 1px var(--ln)}
+.tb{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;border:0;background:none;color:var(--mu);font-size:11px;font-weight:650;padding:2px 0;cursor:pointer;min-width:0}
+.tb .pill{width:58px;height:32px;border-radius:16px;display:grid;place-items:center;transition:background .15s}.tb.on{color:var(--pine)}.tb.on .pill{background:var(--tint)}
+.tb.add .pill{width:54px;height:54px;border-radius:27px;background:var(--pine);color:var(--on);margin-top:-26px;box-shadow:0 8px 20px rgba(47,93,80,.35)}.tb.add.on .pill{background:var(--pine)}.tb.add{color:var(--mu)}
+/* sheets and toast */
+.ov{position:fixed;inset:0;z-index:50;background:rgba(10,20,17,0);display:flex;align-items:flex-end;justify-content:center;transition:background .2s}.ov.on{background:rgba(10,20,17,.48)}
+.sh{width:100%;max-width:560px;background:var(--card);border-radius:30px 30px 0 0;padding:10px 20px max(22px,env(safe-area-inset-bottom));transform:translateY(105%);transition:transform .24s cubic-bezier(.2,.8,.2,1);max-height:88vh;overflow:auto}.ov.on .sh{transform:none}
+.sh .grab{width:40px;height:4px;border-radius:2px;background:var(--track);margin:0 auto 16px}.sh h3{margin:0 0 8px;font-size:21px;letter-spacing:-.01em}.sh p{margin:0 0 14px;color:var(--mu);line-height:1.45}.sh .btn{margin-top:10px}
+.sh .opt{display:flex;align-items:center;gap:12px;width:100%;min-height:58px;border:0;background:var(--fill);border-radius:16px;padding:0 16px;margin-top:8px;font-size:17px;font-weight:600;text-align:left;cursor:pointer}.sh .opt span{margin-left:auto;color:var(--mu);font-weight:500;font-size:14px}
+.toast{position:fixed;left:50%;bottom:116px;transform:translate(-50%,16px);opacity:0;background:var(--ink);color:var(--bg);padding:12px 18px;border-radius:16px;font-weight:650;font-size:15px;transition:opacity .2s,transform .2s;z-index:70;max-width:86vw;pointer-events:none;text-align:center}.toast.on{opacity:1;transform:translate(-50%,0)}
+.spin{width:34px;height:34px;border-radius:50%;border:4px solid var(--track);border-top-color:var(--pine);animation:sp .8s linear infinite;margin:30vh auto 0}@keyframes sp{to{transform:rotate(360deg)}}
+.empty{padding:36px 28px;text-align:center;color:var(--mu)}.empty .ic{width:40px;height:40px;margin-bottom:8px;opacity:.6}
+.center{padding:48px 24px 24px;text-align:center}.center h1{margin:18px 0 8px;font-size:28px;letter-spacing:-.02em}.center p{color:var(--mu);margin:0 0 20px;line-height:1.45}
+:focus-visible{outline:3px solid var(--pine);outline-offset:2px}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+.rpd{margin-top:6px}
+.rpl{max-height:min(56vh,430px);overflow-y:auto;overscroll-behavior:contain;border-top:1px solid var(--ln)}
+.rpl .row{min-height:56px;padding:8px 16px 8px 20px}.rpl .row.nl::before{left:20px}.rpl .row.mo{padding-left:38px}.rpl .row.mo::before{left:38px}
+.rpl .row.on{background:var(--tint)}.rpl .row.on .tx b{color:var(--pine)}
+.rpl .row .tx b{font-size:16px}.rpl .row.yr .tx b{font-size:17px;font-weight:750}
+.rpl .row .rt,.rpr .rt{flex-direction:row;align-items:center;gap:8px}.rpl .row .rt b,.rpr .rt b{font-size:16px;font-weight:700;white-space:nowrap}.rpl .row .rt .ic{color:var(--pine)}.rpr .rt .ic{color:var(--mu)}
+.rpr{min-height:62px}
+
+/* аренда */
+.stt{grid-template-columns:repeat(3,1fr)}.stt b{font-size:21px}
+.seg{overflow-x:auto;scrollbar-width:none}.seg::-webkit-scrollbar{display:none}
+.form h3{margin:24px 4px 4px}
+.card .bars .br{grid-template-columns:70px 1fr auto}
+label.btn{cursor:pointer}
+.ib:disabled{cursor:default}
+</style></head><body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="i-home" viewBox="0 0 24 24"><path d="M3.5 11 12 3.5 20.5 11M5.5 9.5V20h4.5v-5.5h4V20h4.5V9.5"/></symbol>
+<symbol id="i-base" viewBox="0 0 24 24"><rect x="3.5" y="4" width="17" height="6.5" rx="2.2"/><rect x="3.5" y="13.5" width="17" height="6.5" rx="2.2"/><path d="M7 7.25h.01M7 16.75h.01"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="i-chart" viewBox="0 0 24 24"><path d="M5 20v-8M12 20V5M19 20v-5"/></symbol>
+<symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 6.5h8M17 6.5h3M4 12h3M12 12h8M4 17.5h10M19 17.5h1"/><circle cx="14.5" cy="6.5" r="2.3"/><circle cx="9.5" cy="12" r="2.3"/><circle cx="16.5" cy="17.5" r="2.3"/></symbol>
+<symbol id="i-calc" viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="3.2"/><path d="M8.5 7.5h7M8.5 12h.01M12 12h.01M15.5 12h.01M8.5 16h.01M12 16h.01M15.5 16h.01"/></symbol>
+<symbol id="i-phone" viewBox="0 0 24 24"><path d="M5.2 4h3.3l1.7 4.3-2.1 1.4a11.5 11.5 0 0 0 5.2 5.2l1.4-2.1 4.3 1.7v3.3a1.8 1.8 0 0 1-1.9 1.8A15.6 15.6 0 0 1 3.4 5.9 1.8 1.8 0 0 1 5.2 4z"/></symbol>
+<symbol id="i-send" viewBox="0 0 24 24"><path d="M21 3 10.5 13.5M21 3l-6.5 18-4-7.5L3 9.5z"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7.5"/></symbol>
+<symbol id="i-left" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
+<symbol id="i-right" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></symbol><symbol id="i-chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+<symbol id="i-cal" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="3.2"/><path d="M8 3v4M16 3v4M3.5 10h17"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></symbol>
+<symbol id="i-bike" viewBox="0 0 24 24"><circle cx="5.5" cy="16" r="3.5"/><circle cx="18.5" cy="16" r="3.5"/><path d="M5.5 16 9 8h5.5l4 8M9 8 8 6H6M14.5 8 12 16H9"/></symbol>
+<symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0"/></symbol>
+<symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8.5" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 5.2a3.5 3.5 0 0 1 0 6.6M18 14.2a6.5 6.5 0 0 1 3.5 5.8"/></symbol>
+<symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.6 0l3-3a4 4 0 0 0-5.6-5.6l-1 1M14 10a4 4 0 0 0-5.6 0l-3 3a4 4 0 0 0 5.6 5.6l1-1"/></symbol>
+<symbol id="i-down" viewBox="0 0 24 24"><path d="M12 4v11M7 10.5l5 5 5-5M5 20h14"/></symbol>
+<symbol id="i-up" viewBox="0 0 24 24"><path d="M12 15V4M7 8.5l5-5 5 5M5 20h14"/></symbol>
+<symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 3.5 21.5 20h-19zM12 10v4.5M12 17.5h.01"/></symbol>
+<symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3 19.5 6v5.5c0 4.7-3.2 8-7.5 9.5-4.3-1.5-7.5-4.8-7.5-9.5V6z"/><path d="m9 12 2.2 2.2L15.2 10"/></symbol>
+<symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9.5 7V4h5v3M6.5 7l1 13h9l1-13M10 11v5M14 11v5"/></symbol>
+<symbol id="i-edit" viewBox="0 0 24 24"><path d="m4 20 4-1 11-11-3-3L5 16zM14 6l3 3"/></symbol>
+<symbol id="i-receipt" viewBox="0 0 24 24"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6"/></symbol>
+<symbol id="i-swap" viewBox="0 0 24 24"><path d="m17 3.5 3.5 3.5L17 10.5M20.5 7H9a4.5 4.5 0 0 0-4.5 4.5M7 20.5 3.5 17 7 13.5M3.5 17H15a4.5 4.5 0 0 0 4.5-4.5"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+<symbol id="i-box" viewBox="0 0 24 24"><rect x="3.5" y="4" width="17" height="5" rx="1.6"/><path d="M5 9v9.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V9M10 13h4"/></symbol>
+<symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01"/></symbol>
+<symbol id="i-bolt" viewBox="0 0 24 24"><path d="m13 3-8 11h6l-1 7 8-11h-6z"/></symbol>
+<symbol id="i-doc" viewBox="0 0 24 24"><path d="M6.5 3h8l4 4v14h-12zM14 3v5h5M9.5 13h6M9.5 17h6"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="3"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/></symbol>
+<symbol id="i-flag" viewBox="0 0 24 24"><path d="M5.5 21V4M5.5 4.5h12l-2.5 4 2.5 4h-12"/></symbol>
+<symbol id="i-copy" viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="11.5" height="12" rx="2.5"/><path d="M15.5 8.5V6A2.5 2.5 0 0 0 13 3.5H6.5A2.5 2.5 0 0 0 4 6v7.5A2.5 2.5 0 0 0 6.5 16h2"/></symbol>
+</defs></svg>
+<div id="app"><div class="spin" aria-label="Загрузка"></div></div>
+<nav id="nav" style="display:none"><div class="bar" id="navbar"></div></nav>
+<div class="toast" id="toast" role="status"></div>
+<script>
+const T=(window.Telegram&&Telegram.WebApp)||{};
+try{T.ready();T.expand()}catch(e){}
+const $=s=>document.querySelector(s),v=s=>$(s).value,m=n=>Math.round(n).toLocaleString('ru')+'\u00A0₽',fmt=d=>d.split('-').reverse().join('.');
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const tx2=t=>esc(t).replace(/\n/g,'<br>');
+const ic=(n,c='')=>`<svg class="ic ${c}" aria-hidden="true"><use href="#i-${n}"/></svg>`;
+const hap=k=>{try{k?T.HapticFeedback.notificationOccurred(k):T.HapticFeedback.impactOccurred('light')}catch(e){}};
+const ABORT={abort:1};
+/* ---------- theme: follows Telegram */
+function setTheme(){const d=T.colorScheme||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light');document.documentElement.dataset.theme=d;
+try{const bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();T.setHeaderColor&&T.setHeaderColor(bg);T.setBackgroundColor&&T.setBackgroundColor(bg)}catch(e){}}
+setTheme();try{T.onEvent('themeChanged',setTheme)}catch(e){}
+/* ---------- dates */
+const WD=['вс','пн','вт','ср','чт','пт','сб'],WF=['воскресенье','понедельник','вторник','среда','четверг','пятница','суббота'],MG=['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+const dow=d=>new Date(d+'T00:00:00Z').getUTCDay(),dnum=d=>+d.slice(8,10);
+const dlong=d=>`${WF[dow(d)]}, ${dnum(d)} ${MG[+d.slice(5,7)-1]}`,dshort=d=>`${dnum(d)} ${MG[+d.slice(5,7)-1]}`;
+const dayWord=n=>{const a=Math.abs(n)%100,b=a%10;return a>10&&a<20?'дней':b==1?'день':b>1&&b<5?'дня':'дней'};
+/* ---------- sheets (windows that slide up) and toast */
+function sheet(html,wire,cancel){return new Promise(res=>{const o=document.createElement('div');o.className='ov';o.innerHTML=`<div class=sh role=dialog aria-modal=true><div class=grab></div>${html}</div>`;document.body.appendChild(o);requestAnimationFrame(()=>requestAnimationFrame(()=>o.classList.add('on')));
+const done=x=>{o.classList.remove('on');setTimeout(()=>o.remove(),240);res(x)};o.addEventListener('click',e=>{if(e.target===o)done(cancel)});wire(o,done)})}
+const uiAlert=(t,title)=>sheet(`${title?`<h3>${esc(title)}</h3>`:''}<p>${tx2(t)}</p><button class="btn blk" data-y>Понятно</button>`,(o,d)=>o.querySelector('[data-y]').onclick=()=>d(),undefined);
+const uiConfirm=(t,yes,o={})=>sheet(`${o.title?`<h3>${esc(o.title)}</h3>`:''}<p>${tx2(t)}</p><button class="btn blk ${o.danger?'dng':''}" data-y>${esc(yes||'Да')}</button><button class="btn sec blk" data-n>Отмена</button>`,(el,d)=>{el.querySelector('[data-y]').onclick=()=>d(true);el.querySelector('[data-n]').onclick=()=>d(false)},false);
+const uiPrompt=(t,v0)=>sheet(`<p>${tx2(t)}</p><input type=number inputmode=numeric value="${esc(v0)}"><button class="btn blk" data-y>Готово</button><button class="btn sec blk" data-n>Отмена</button>`,(o,d)=>{o.querySelector('[data-y]').onclick=()=>d(o.querySelector('input').value);o.querySelector('[data-n]').onclick=()=>d(null)},null);
+const uiPick=(t,L)=>sheet(`<h3>${esc(t)}</h3>${L.map((x,i)=>`<button class=opt data-i=${i}>${esc(x)}</button>`).join('')}<button class="btn sec blk" data-n>Отмена</button>`,(o,d)=>{o.querySelectorAll('[data-i]').forEach(b=>b.onclick=()=>d(L[+b.dataset.i]));o.querySelector('[data-n]').onclick=()=>d(null)},null);
+let tt;function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('on');clearTimeout(tt);tt=setTimeout(()=>e.classList.remove('on'),2200)}
+/* ---------- api */
+const api=async(p,b)=>{const r=await fetch(p,{method:b?'POST':'GET',headers:{'X-Init':T.initData||'','Content-Type':'application/json'},body:b&&JSON.stringify(b)});if(!r.ok){let e;try{e=(await r.json()).err}catch(x){}throw e||'код '+r.status}return r.json()};
+window.onerror=(msg,u,l)=>{uiAlert('Ошибка: '+msg+' (строка '+l+')')};
+window.addEventListener('unhandledrejection',e=>{const r=e.reason;e.preventDefault();if(r===ABORT)return;uiAlert('Ошибка: '+((r&&r.message)||r))});
+/* ---------- данные и роли */
+let S=null,ME=null,V=[['today']],navDir='',lastLoad=0,FIN={mode:'m',off:0},FT='an',PF='all',QS='';
+const K=k=>S?Object.entries(S.docs[k]||{}).map(([id,d])=>({id,...d})):[];
+const G=(k,id)=>S&&id&&S.docs[k][id]?{id,...S.docs[k][id]}:null;
+const isOwner=()=>ME&&ME.role=='owner',can=p=>isOwner()||!!(ME&&(ME.perms||[]).includes(p)),fin=()=>can('reports');
+const TODAY=()=>S?S.today:new Date().toISOString().slice(0,10);
+const TY={w:'неделя',m:'месяц'},TY2={w:'нед.',m:'мес.'},LEN={w:7,m:30};
+const MT={cash:'наличные',transfer:'перевод',qr:'QR (СБП)'};
+const addD=(d,n)=>{const x=new Date(d+'T00:00:00Z');x.setUTCDate(x.getUTCDate()+n);return x.toISOString().slice(0,10)};
+const diff=(a,b)=>Math.round((new Date(a+'T00:00:00Z')-new Date(b+'T00:00:00Z'))/864e5);
+const rel=n=>n==0?'сегодня':n==1?'завтра':n==-1?'вчера':n>1?`через ${n} ${dayWord(n)}`:`${-n} ${dayWord(n)} назад`;
+const chip=(t,c='t-n')=>`<span class="chip ${c}">${esc(t)}</span>`;
+const ini=n=>String(n||'?').split(/\s+/).slice(0,2).map(x=>x[0]||'').join('').toUpperCase();
+const cname=id=>(G('client',id)||{}).name||'—',bnum=id=>{const b=G('bike',id);return b?(b.num||b.name):'без велосипеда'},bfull=id=>{const b=G('bike',id);return b?`${b.num?b.num+' · ':''}${b.name}`:'без велосипеда'};
+const rentOf=(f,id)=>K('rent').find(r=>r.status=='active'&&r[f]==id);
+const per=r=>`${m(r.st&&r.st.nprice!=null?r.st.nprice:r.price)} / ${TY[r.st&&r.st.ntype||r.type]}`;
+const BS={free:['Свободен','t-ok'],rent:['В аренде','t-bl'],repair:['В ремонте','t-wa'],sold:['Продан','t-n'],off:['Списан','t-n']};
+const bstat=b=>b.rent?'rent':(b.status||'free');
+async function act(a,b={}){return api('/api/act',{a,...b})}
+async function load(){S=await api('/api/all');lastLoad=Date.now()}
+async function reload(){await load();render(true)}
+function nav(k){V=[[k]];navDir='';render()}
+function go(s,a){V.push([s,a]);navDir='fw';render()}
+const back=()=>{if(V.length>1){V.pop();navDir='bw'}render()};
+function chrome(){try{const n=ME&&ME.role=='client'?1:V.length;n>1?T.BackButton.show():T.BackButton.hide()}catch(e){}}
+try{T.BackButton.onClick(()=>{if(document.querySelector('.ov'))return;back()})}catch(e){}
+document.addEventListener('visibilitychange',async()=>{if(document.visibilityState=='visible'&&S&&Date.now()-lastLoad>30000&&!document.querySelector('.ov')){try{await load();render(true)}catch(e){}}});
+function navUI(){const R=V[0][0],it=[['today','home','Сегодня'],['park','bike','Парк']];
+if(can('rents'))it.push(['issue','plus','Выдать']);if(fin()||can('exp'))it.push(['fin','chart','Финансы']);it.push(['more','list','Ещё']);
+$('#navbar').innerHTML=it.map(([k,i,n])=>`<button class="tb ${k=='issue'?'add':''} ${R==k?'on':''}" onclick="hap();nav('${k}')" aria-label="${n}"><span class=pill>${ic(i)}</span>${n}</button>`).join('')}
+function render(keep){const[s,a]=V[V.length-1];const f=SCR[s];if(!f){V=[['today']];return render()}
+const y=keep?scrollY:0,el=$('#app');el.innerHTML=f(a);el.className='';if(navDir){void el.offsetWidth;el.className=navDir}navDir='';scrollTo(0,y);navUI();chrome();
+if(SCR[s].after)SCR[s].after(a)}
+const hd=(t,sm,btn='')=>`<div class=hd><div>${sm?`<small>${esc(sm)}</small>`:''}<h1>${esc(t)}</h1></div>${btn}</div>`;
+const bk=()=>`<button class=back onclick="back()">${ic('left','s')}Назад</button>`;
+const empty=(t,i='box')=>`<div class=empty>${ic(i)}<div>${esc(t)}</div></div>`;
+const kv=(k,v)=>`<div class=kv><span>${esc(k)}</span><b>${v}</b></div>`;
+/* ---------- строка аренды */
+function rentRow(r){const s=r.st,c=G('client',r.client)||{};let rt,sub,tone='t-bl';
+if(s.late>0){tone=s.defer?'t-wa':'t-er';rt=`<b style="color:var(--${s.defer?'wat':'ert'})">${m(s.debt)}</b>${s.defer?chip('отсрочка до '+fmt(s.defer).slice(0,5),'t-wa'):chip(s.late+' '+dayWord(s.late),'t-er')}`;sub=`${bnum(r.bike)} · оплата была ${fmt(s.next).slice(0,5)}`}
+else{rt=`<b>${m(s.nprice)}</b>${chip(rel(s.left),s.left==0?'t-wa':s.left==1?'t-bl':'t-n')}`;sub=`${bnum(r.bike)} · ${TY[s.ntype]} · до ${fmt(s.until).slice(0,5)}`;if(s.left==0)tone='t-wa';if(s.defer)sub+=' · отсрочка'}
+return `<button class=row onclick="go('rent','${r.id}')"><span class="av ${tone}">${esc(ini(c.name))}</span><span class=tx><b>${esc(c.name||'—')}</b><span>${esc(sub)}</span></span><span class=rt>${rt}</span></button>`}
+/* ---------- Сегодня */
+function today(){const act_=K('rent').filter(r=>r.status=='active'),late=act_.filter(r=>r.st.late>0).sort((a,b)=>b.st.late-a.st.late),
+soon=act_.filter(r=>!(r.st.late>0)).sort((a,b)=>a.st.left-b.st.left||a.st.nprice-b.st.nprice),
+req=K('req').filter(q=>q.status=='pending'),unk=K('unk').filter(u=>u.status=='open'),
+bikes=K('bike').filter(b=>!['sold','off'].includes(b.status)),dueT=soon.filter(r=>r.st.left==0).reduce((a,r)=>a+r.st.nprice,0)+late.reduce((a,r)=>a+r.st.debt,0);
+let h=hd('Сегодня',dlong(TODAY()));
+if(ME.empty&&isOwner())h+=`<div class="note t-bl">${ic('down')}<div><b>База пока пустая.</b><br>Загрузите файл переноса из старого сервиса — велосипеды, клиенты, аренды и платежи появятся сразу.<br><button class="btn sm" onclick="nav('more');setTimeout(()=>go('backup'),0)">Загрузить файл</button></div></div>`;
+h+=`<div class=stt style="grid-template-columns:repeat(3,1fr)"><div><b>${act_.length}/${bikes.length}</b><span>в аренде</span></div><div><b>${late.length}</b><span>просрочено</span></div><div><b>${m(dueT)}</b><span>ждём сегодня</span></div></div>`;
+h+=`<h2 class="sec ${late.length?'t-er':''}">Просрочено ${late.length?`<span class=bdg>${late.length}</span>`:''}</h2>`;
+h+=late.length?`<div class=grp>${late.map(rentRow).join('')}</div>`:`<div class=grp>${empty('Просрочек нет','check')}</div>`;
+if(req.length)h+=`<h2 class=sec>Заявки на отсрочку <span class=bdg style="background:var(--wa)">${req.length}</span></h2><div class=grp>${req.map(q=>{const r=G('rent',q.rent)||{};return `<div class="row wr nl" style="cursor:default"><span class="av t-wa">${esc(ini(cname(q.client)))}</span><span class=tx><b>${esc(cname(q.client))}</b><span>Просит ${q.days} ${dayWord(q.days)} без неустойки · ${esc(bnum(r.bike))}${r.st?' · оплата '+fmt(r.st.next).slice(0,5):''}</span>${can('defer')?`<span style="display:flex;gap:8px;margin-top:8px"><button class="btn sm" onclick="reqDo('${q.id}',1)">Одобрить</button><button class="btn sm sec" onclick="reqDo('${q.id}',0)">Отклонить</button></span>`:''}</span></div>`}).join('')}</div>`;
+if(unk.length)h+=`<h2 class="sec t-er">Не распознано <span class=bdg>${unk.length}</span></h2><div class=grp>${unk.map(u=>{const r=G('rent',u.rent)||{};return `<button class=row onclick="unkS('${u.id}')"><span class="gl t-er">${ic('alert')}</span><span class=tx><b>${m(u.amt)}</b><span>${esc(r.client?cname(r.client):'')} · ${fmt(u.ts.slice(0,10))}</span></span>${ic('right','s')}</button>`}).join('')}</div>`;
+h+=`<h2 class=sec>Ближайшие оплаты</h2>`+(soon.length?`<div class=grp>${soon.map(rentRow).join('')}</div>`:`<div class=grp>${empty('Активных аренд нет','bike')}</div>`);
+return h}
+async function reqDo(id,ok){try{await act('req',{id,ok:!!ok});hap('success');toast(ok?'Отсрочка дана':'Заявка отклонена');await reload()}catch(e){uiAlert(e)}}
+/* ---------- Аренда */
+function rent(id){const r=G('rent',id);if(!r)return bk()+empty('Аренда не найдена');const s=r.st,c=G('client',r.client)||{},on=r.status=='active';
+let h=bk()+`<div class=dh><div>${on?chip(s.late>0?'Просрочка':'Активна',s.late>0?'t-er':'t-ok'):chip(r.status=='seized'?'Изъята':'Закрыта','t-n')} ${c.black?chip('чёрный список','t-er'):''}</div>
+<h1 onclick="go('client','${r.client}')" style="cursor:pointer">${esc(c.name||'—')}</h1><div class=mu>${esc(bfull(r.bike))}${r.contract?' · договор №'+esc(r.contract):''}</div></div>`;
+if(on){if(s.late>0)h+=`<div class="card t-er"><div class=sm>Просрочка ${s.late} ${dayWord(s.late)} · оплата была ${dshort(s.next)}</div><div class=big>${m(s.debt)}</div><div class=sm>${s.due_n>1?`за ${s.due_n} периода, `:''}${s.pen?`в том числе неустойка ${m(s.pen)}`:'неустойки нет'}${s.defer?` · отсрочка до ${dshort(s.defer)}`:''}</div></div>`;
+else h+=`<div class="card ${s.left==0?'t-wa':'tint'}"><div class=sm>${s.left==0?'Оплата сегодня':'Следующая оплата '+rel(s.left)}, ${dshort(s.next)}</div><div class=big>${m(s.nprice)}</div><div class=sm>за ${TY[s.ntype]} · оплачено по ${dshort(s.until)}${s.defer?` · отсрочка до ${dshort(s.defer)}`:''}</div></div>`;
+const A=[];if(can('pay'))A.push(`<button class=btn onclick="payS('${id}')">${ic('check','s')}Принять оплату</button>`,`<button class="btn sec" onclick="qrS('${id}')">${ic('receipt','s')}QR на оплату</button>`);
+if(can('defer'))A.push(`<button class="btn sec" onclick="deferS('${id}')">${ic('clock','s')}Отсрочка</button>`);if(can('rents'))A.push(`<button class="btn sec" onclick="priceS('${id}')">${ic('edit','s')}Цена / период</button>`);
+h+=`<div class=acts>${A.join('')}</div>`}
+else{h+=`<div class=card>${kv('Закрыта',fmt(r.closed||''))}${r.debt?kv('Долг клиента',`<span style="color:var(--ert)">${m(r.debt)}</span>`):''}${r.refund?kv('Возвращено клиенту',m(r.refund.amt)):''}${r.writeoff?kv('Списано при изъятии',m(r.writeoff)):''}</div>`;
+if(r.debt&&can('pay'))h+=`<div class=acts><button class=btn onclick="payDebt('${id}')">Долг погашен</button><button class="btn sec" onclick="qrS('${id}',1)">QR на долг</button></div>`}
+const ch=(r.plan||[]).filter(x=>x.k>(on?s.paid:0)).map(x=>`с периода ${x.k}: ${m(x.price)} / ${TY[x.type]}`),once=Object.entries(r.once||{}).filter(([k])=>+k>(on?s.paid:0)).map(([k,p])=>`разово, период ${k}: ${m(p)}`);
+h+=`<h2 class=sec>Условия</h2><div class=card>${on?kv('Тариф',per(r)):kv('Тариф',`${r.price?m(r.price)+' / ':''}${TY[r.type]}`)}${ch.concat(once).map(x=>kv('Запланировано',esc(x))).join('')}
+${kv('Выдан',fmt(r.issued||r.start))}${r.free?kv('Первый день','бесплатно'):''}${on?kv('Оплачено периодов',s.paid):''}${kv('Всего оплачено',m((r.pays||[]).reduce((a,p)=>a+p.amt,0)))}${r.imported?kv('Источник','перенос из старого сервиса'):''}</div>`;
+if(on&&(can('rents')||can('seize')||isOwner())){const B=[];if(can('rents'))B.push(`<button class="btn sec" onclick="returnS('${id}')">${ic('down','s')}Возврат</button>`,`<button class="btn sec" onclick="contractS('${id}')">${ic('doc','s')}Договор</button>`);
+if(isOwner())B.push(`<button class="btn sec" onclick="fixS('${id}')">${ic('cal','s')}Дата оплаты</button>`);if(can('seize'))B.push(`<button class="btn dng" onclick="seizeS('${id}')">${ic('lock','s')}Изъять</button>`);h+=`<div class=acts>${B.join('')}</div>`}
+const P=(r.pays||[]).map((p,i)=>({...p,i})).reverse();
+h+=`<h2 class=sec>Платежи</h2>`+(P.length?`<div class=grp>${P.map(p=>`<div class="row nl" style="cursor:default;min-height:58px"><span class=tx><b>${m(p.amt)}</b><span>${fmt(p.ts.slice(0,10))} · ${MT[p.method]||p.method}${p.n?` · ${p.n} ${p.n==1?'период':'периода'}`:p.kind=='debt'?' · долг':''}${p.pen?` · неустойка ${m(p.pen)}`:''}${p.by?' · '+esc(p.by):''}</span></span>${isOwner()&&!p.old&&on?`<button class="btn sm sec" onclick="payDel('${id}',${p.i})">${ic('trash','s')}</button>`:''}</div>`).join('')}</div>`:`<div class=grp>${empty('Платежей ещё нет','receipt')}</div>`);
+if((r.defer||[]).length)h+=`<h2 class=sec>Отсрочки</h2><div class=grp>${r.defer.slice().reverse().map(x=>`<div class="row nl" style="cursor:default;min-height:54px"><span class=tx><b>до ${fmt(x.until)}</b><span>с ${fmt(x.from)} · ${esc(x.by||'')}${x.req?' · по заявке клиента':''}</span></span></div>`).join('')}</div>`;
+return h}
+const V_=id=>(G('rent',id)||{})._v;
+async function doAct(a,b,msg){try{const r=await act(a,b);hap('success');if(msg)toast(msg);await reload();return r}catch(e){hap('error');uiAlert(String(e));throw ABORT}}
+function seg(name,opts,cur){return `<div class="seg in" data-seg="${name}">${opts.map(([k,t])=>`<button type=button data-v="${k}" class="${k==cur?'on':''}">${esc(t)}</button>`).join('')}</div>`}
+function wireSeg(o,cb){o.querySelectorAll('[data-seg]').forEach(g=>g.querySelectorAll('button').forEach(b=>b.onclick=()=>{g.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x==b));g.dataset.val=b.dataset.v;cb&&cb()}))}
+const segv=(o,n)=>{const g=o.querySelector(`[data-seg="${n}"]`);return g.dataset.val||(g.querySelector('.on')||{}).dataset.v};
+async function payS(id){const r=G('rent',id),pn=r.st.ntype=='w'?[1,2,3,4]:[1,2,3];
+await sheet(`<h3>Принять оплату</h3><p>${esc(cname(r.client))} · ${esc(bnum(r.bike))}. Засчитываются только целые периоды вместе с неустойкой.</p>
+<label class=fld><span>Сколько периодов</span>${seg('n',pn.map(k=>[k,k+' '+TY2[r.st.ntype]]),r.st.due_n>1?Math.min(r.st.due_n,pn.length):1)}</label>
+<label class=fld><span>Способ</span>${seg('m',[['cash','Наличные'],['transfer','Перевод']],'cash')}</label>
+<div class=pv><div class=sm>К оплате</div><div class=big id=qa>…</div><div class=sm id=qd></div></div>
+<button class="btn blk lg" data-y disabled>Оплата получена</button><button class="btn sec blk" data-n>Отмена</button>`,(o,d)=>{let q=null;
+const upd=async()=>{o.querySelector('[data-y]').disabled=true;try{q=await act('quote',{id,n:+segv(o,'n')});o.querySelector('#qa').textContent=m(q.amt);o.querySelector('#qd').textContent=`период ${fmt(q.from)} – ${fmt(q.to)}${q.pen?` · неустойка ${m(q.pen)}`:''}`;o.querySelector('[data-y]').disabled=false}catch(e){o.querySelector('#qa').textContent='—';o.querySelector('#qd').textContent=e}};
+wireSeg(o,upd);upd();o.querySelector('[data-n]').onclick=()=>d();
+o.querySelector('[data-y]').onclick=async()=>{o.querySelector('[data-y]').disabled=true;try{await doAct('pay',{id,n:+segv(o,'n'),method:segv(o,'m'),v:V_(id)},'Оплата записана');d()}catch(e){d()}}})}
+async function payDebt(id){const r=G('rent',id);if(!await uiConfirm(`Отметить, что клиент погасил долг ${m(r.debt)}?`,'Долг погашен'))return;await doAct('paydebt',{id,v:V_(id)},'Долг погашен').catch(()=>{})}
+async function payDel(id,k){if(!await uiConfirm('Удалить этот платёж? Оплаченные периоды уменьшатся.','Удалить',{danger:true}))return;await doAct('paydel',{id,k,v:V_(id)},'Платёж удалён').catch(()=>{})}
+async function qrS(id,debt){if(!S.cfg.tochka.on)return uiAlert('Чтобы выставлять QR, подключите Точку: Ещё → Настройки → Оплата по QR. Пока оплату можно отметить вручную.','QR не подключён');
+const r=G('rent',id);let n=1;if(!debt){const pn=r.st.ntype=='w'?['1','2','3','4']:['1','2','3'];const x=await uiPick('QR на сколько периодов?',pn.map(k=>k+' '+TY2[r.st.ntype]));if(!x)return;n=parseInt(x)}
+let q;try{q=await act('qr',{id,n:debt?0:n,v:V_(id)})}catch(e){return uiAlert(e)}await showQR(q.qr,`${cname(r.client)} · ${bnum(r.bike)}`);await reload()}
+async function showQR(qid,title,client){let q;try{q=await api('/api/qr/'+qid)}catch(e){return uiAlert(e)}let timer;
+await sheet(`<h3>${client?'Оплата по QR':'QR на оплату'}</h3><p>${esc(title||'')}</p><div class=pv style="text-align:center"><div class=big>${m(q.amt)}</div><div class=sm>${q.pen?'в том числе неустойка '+m(q.pen)+' · ':''}действует до конца дня</div>
+${q.img?`<img src="data:image/png;base64,${esc(q.img)}" alt="QR" style="width:220px;height:220px;margin:14px auto 0;display:block;border-radius:16px;background:#fff">`:''}</div>
+<div id=qs class="note t-bl" style="margin:10px 0">${ic('clock','s')}<div>Ждём оплату…</div></div>
+<a class="btn blk" href="${esc(q.payload)}" target=_blank>${ic('link','s')}Открыть в приложении банка</a>
+${client?'':`<button class="btn sec blk" data-s>${ic('send','s')}Отправить клиенту</button><button class="btn sec blk" data-c>${ic('copy','s')}Скопировать ссылку</button>`}<button class="btn sec blk" data-x>Закрыть</button>`,(o,d)=>{
+o.querySelector('[data-x]').onclick=()=>d();const s=o.querySelector('[data-s]');if(s)s.onclick=()=>T.openTelegramLink('https://t.me/share/url?url='+encodeURIComponent(q.payload)+'&text='+encodeURIComponent('Оплата аренды: '+m(q.amt)));
+const c=o.querySelector('[data-c]');if(c)c.onclick=async()=>{try{await navigator.clipboard.writeText(q.payload);toast('Ссылка скопирована')}catch(e){}};
+const poll=async()=>{try{const x=await api('/api/qr/'+qid);if(x.status=='paid'){hap('success');o.querySelector('#qs').className='note t-ok';o.querySelector('#qs').innerHTML=ic('check','s')+'<div><b>Оплачено</b></div>';clearInterval(timer)}else if(x.status!='open'){o.querySelector('#qs').className='note t-n';o.querySelector('#qs').innerHTML='<div>QR больше не действует</div>';clearInterval(timer)}}catch(e){}};
+timer=setInterval(()=>{if(!document.body.contains(o)){clearInterval(timer);return}poll()},5000)},null);clearInterval(timer)}
+async function deferS(id){const r=G('rent',id),def=addD(r.st.late>0?TODAY():r.st.next,3);
+await sheet(`<h3>Отсрочка без неустойки</h3><p>Пока отсрочка действует, неустойка не начисляется. Следующий период не сдвигается.</p>
+<label class=fld><span>До какой даты включительно</span><input type=date id=du value="${def}" min="${TODAY()}"></label>
+<button class="btn blk lg" data-y>Дать отсрочку</button>${r.st.defer?`<button class="btn dng blk" data-u>Снять текущую отсрочку</button>`:''}<button class="btn sec blk" data-n>Отмена</button>`,(o,d)=>{
+o.querySelector('[data-n]').onclick=()=>d();o.querySelector('[data-y]').onclick=()=>doAct('defer',{id,until:o.querySelector('#du').value,v:V_(id)},'Отсрочка дана').finally(()=>d()).catch(()=>{});
+const u=o.querySelector('[data-u]');if(u)u.onclick=()=>doAct('undefer',{id,v:V_(id)},'Отсрочка снята').finally(()=>d()).catch(()=>{})})}
+async function priceS(id){const r=G('rent',id),s=r.st;
+await sheet(`<h3>Цена и период</h3><p>Новые условия действуют с ближайшего неоплаченного периода (с ${dshort(s.next)}). Оплаченные периоды не меняются.</p>
+<label class=fld><span>Цена за период, ₽</span><input type=number inputmode=numeric id=pp value="${s.nprice}"></label>
+<label class=fld><span>Период</span>${seg('t',[['w','Неделя'],['m','Месяц']],s.ntype)}</label>
+<label class=sw style="padding:16px 0 0"><span class=tx><b>Только на один период</b><span>Скидка или повышенная цена разово, потом снова обычная цена клиента</span></span><input type=checkbox id=po></label>
+<button class="btn blk lg" data-y>Сохранить</button><button class="btn sec blk" data-n>Отмена</button>`,(o,d)=>{wireSeg(o);
+const t=o.querySelector('[data-seg=t]');o.querySelector('#po').onchange=e=>{t.style.opacity=e.target.checked?.4:1;t.style.pointerEvents=e.target.checked?'none':''};
+o.querySelector('[data-n]').onclick=()=>d();o.querySelector('[data-y]').onclick=()=>doAct('price',{id,price:+o.querySelector('#pp').value,type:segv(o,'t'),once:o.querySelector('#po').checked,v:V_(id)},'Условия изменены').finally(()=>d()).catch(()=>{})})}
+async function returnS(id){const r=G('rent',id),s=r.st;
+await sheet(`<h3>Возврат велосипеда</h3><p>Аренда закроется, велосипед станет свободным.</p>
+<label class=fld><span>Вернуть клиенту, ₽ (за неиспользованные дни)</span><input type=number inputmode=numeric id=rf value="0"></label>
+<label class=fld><span>Долг клиента, ₽</span><input type=number inputmode=numeric id=rd value="${s.debt}"></label>
+<div class=sub style="margin:6px 4px 0">${s.debt?`Сейчас не оплачено ${m(s.debt)}${s.pen?' (с неустойкой '+m(s.pen)+')':''}. Долг останется за клиентом, его можно погасить позже.`:'Долга нет.'}</div>
+<button class="btn blk lg" data-y>Принять велосипед</button><button class="btn sec blk" data-n>Отмена</button>`,(o,d)=>{o.querySelector('[data-n]').onclick=()=>d();
+o.querySelector('[data-y]').onclick=()=>doAct('return',{id,refund:+o.querySelector('#rf').value||0,debt:+o.querySelector('#rd').value||0,v:V_(id)},'Аренда закрыта').finally(()=>d()).catch(()=>{})})}
+async function seizeS(id){const r=G('rent',id),s=r.st;
+await sheet(`<h3>Изъять велосипед?</h3><p>Аренда закроется, <b>все долги и неустойка клиента обнулятся</b>${s.debt?` (сейчас ${m(s.debt)})`:''}. Сумма попадёт в отчёт как недополученная. Отменить нельзя.</p>
+<label class=fld><span>Для подтверждения напишите ИЗЪЯТЬ</span><input id=cf autocomplete=off></label>
+<button class="btn dng blk lg" data-y>Изъять</button><button class="btn sec blk" data-n>Отмена</button>`,(o,d)=>{o.querySelector('[data-n]').onclick=()=>d();
+o.querySelector('[data-y]').onclick=()=>{const c=o.querySelector('#cf').value.trim().toUpperCase();if(c!='ИЗЪЯТЬ')return toast('Напишите ИЗЪЯТЬ');doAct('seize',{id,confirm:c,v:V_(id)},'Велосипед изъят').finally(()=>d()).catch(()=>{})}})}
+async function contractS(id){const r=G('rent',id);await sheet(`<h3>Номер договора</h3><input id=cn value="${esc(r.contract||'')}"><button class="btn blk" data-y>Сохранить</button><button class="btn sec blk" data-n>Отмена</button>`,(o,d)=>{o.querySelector('[data-n]').onclick=()=>d();o.querySelector('[data-y]').onclick=()=>doAct('contract',{id,contract:o.querySelector('#cn').value,v:V_(id)},'Сохранено').finally(()=>d()).catch(()=>{})})}
+async function fixS(id){const r=G('rent',id);await sheet(`<h3>Исправить дату оплаты</h3><p>Для исправления ошибок: все будущие периоды сдвинутся. Сейчас следующая оплата ${dshort(r.st.next)}.</p><input type=date id=fx value="${r.st.next}"><button class="btn blk" data-y>Сохранить</button><button class="btn sec blk" data-n>Отмена</button>`,(o,d)=>{o.querySelector('[data-n]').onclick=()=>d();o.querySelector('[data-y]').onclick=()=>doAct('fix',{id,next:o.querySelector('#fx').value,v:V_(id)},'Дата исправлена').finally(()=>d()).catch(()=>{})})}
+/* ---------- Выдача */
+const IS={};
+function issue(){const cl=K('client').filter(c=>!rentOf('client',c.id)).sort((a,b)=>a.name.localeCompare(b.name,'ru')),bs=K('bike').filter(b=>bstat(b)=='free').sort((a,b)=>(a.num||'').localeCompare(b.num||'','ru'));
+if(!IS.type)Object.assign(IS,{type:'w',price:S.cfg.week,free:false,pay:'cash',n:1,client:'',bike:''});
+return hd('Выдать велосипед')+`<div class=form>
+<label class=fld><span>Клиент</span><select id=ic onchange="isUpd()"><option value="">— выберите —</option><option value="new" ${IS.client=='new'?'selected':''}>+ Новый клиент</option>${cl.map(c=>`<option value="${c.id}" ${IS.client==c.id?'selected':''}>${esc(c.name)}${c.black?' (чёрный список)':''}</option>`).join('')}</select></label>
+<div id=inew style="display:${IS.client=='new'?'block':'none'}"><label class=fld><span>ФИО</span><input id=inm value="${esc(IS.nm||'')}" oninput="isUpd()"></label><label class=fld><span>Телефон</span><input id=iph type=tel inputmode=tel placeholder="+7" value="${esc(IS.ph||'')}" oninput="isUpd()"></label></div>
+<div id=iblk></div>
+<label class=fld><span>Электровелосипед</span><select id=ib onchange="isUpd()"><option value="">— выберите —</option>${bs.map(b=>`<option value="${b.id}" ${IS.bike==b.id?'selected':''}>${esc((b.num?b.num+' · ':'')+b.name)}</option>`).join('')}</select></label>
+${bs.length?'':'<div class=sub>Свободных велосипедов нет.</div>'}
+<label class=fld><span>Период</span><div class="seg in" id=it>${[['w','Неделя'],['m','Месяц']].map(([k,t])=>`<button type=button class="${IS.type==k?'on':''}" onclick="IS.type='${k}';IS.price=S.cfg['${k=='w'?'week':'month'}'];render(true)">${t}</button>`).join('')}</div></label>
+<div class=f2><label class=fld><span>Цена за ${IS.type=="w"?"неделю":"месяц"}, ₽</span><input type=number inputmode=numeric id=ip value="${IS.price}" oninput="IS.price=+this.value;isUpd()"></label>
+<label class=fld><span>Первый период, ₽</span><input type=number inputmode=numeric id=if placeholder="как обычно" value="${esc(IS.first||'')}" oninput="isUpd()"></label></div>
+<div class=card style="margin:16px 0 0;padding:0"><label class=sw><span class=tx><b>Первый день бесплатно</b><span>Оплаченный период начнётся завтра</span></span><input type=checkbox id=ifr ${IS.free?'checked':''} onchange="IS.free=this.checked;isUpd()"></label></div>
+<label class=fld><span>Оплата сейчас</span><div class="seg in">${[['cash','Наличные'],['transfer','Перевод'],['no','Позже']].map(([k,t])=>`<button type=button class="${IS.pay==k?'on':''}" onclick="IS.pay='${k}';render(true)">${t}</button>`).join('')}</div></label>
+${IS.pay!='no'?`<label class=fld><span>Сколько периодов оплачено</span><div class="seg in">${[1,2,3,4].map(k=>`<button type=button class="${IS.n==k?'on':''}" onclick="IS.n=${k};render(true)">${k}</button>`).join('')}</div></label>`:''}
+<label class=fld><span>Номер договора</span><input id=icn value="${esc(IS.cn||'')}" oninput="isUpd()"></label>
+<div class=pv id=ipv></div>
+<button class="btn blk lg" onclick="doIssue(this)">${ic('check','s')}Выдать</button></div>`}
+function isUpd(){const c=$('#ic'),b=$('#ib');if(!c)return;IS.client=c.value;IS.bike=b.value;IS.nm=$('#inm').value;IS.ph=$('#iph').value;IS.first=$('#if').value;IS.cn=$('#icn').value;$('#inew').style.display=c.value=='new'?'block':'none';
+const cc=G('client',c.value);$('#iblk').innerHTML=cc&&cc.black?`<div class="note t-er" style="margin:10px 0 0">${ic('alert','s')}<div><b>Клиент в чёрном списке.</b>${cc.bnote?'<br>'+esc(cc.bnote):''}</div></div>`:'';
+const t=TODAY(),st=IS.free?addD(t,1):t,first=+$('#if').value||IS.price,L=LEN[IS.type];let sum=0;if(IS.pay!='no')for(let k=0;k<IS.n;k++)sum+=k?IS.price:first;
+const end=addD(st,(IS.pay!='no'?IS.n:1)*L-1);
+$('#ipv').innerHTML=`<div class=sm>${IS.pay=='no'?'Оплата не получена — первый период':'К оплате сейчас'}</div><div class=big>${m(IS.pay=='no'?first:sum)}</div>
+${kv('Выдача',dshort(t)+(IS.free?' (бесплатно)':''))}${kv(IS.pay=='no'?'Первый период':'Оплачено',`${dshort(st)} – ${dshort(IS.pay=='no'?addD(st,L-1):end)}`)}${kv('Следующая оплата',dshort(IS.pay=='no'?st:addD(end,1)))}`}
+async function doIssue(el){let c=$('#ic').value;const b=$('#ib').value;if(!c)return uiAlert('Выберите клиента');if(!b)return uiAlert('Выберите велосипед');
+const cc=G('client',c);if(cc&&cc.black&&!await uiConfirm('Клиент в чёрном списке. Всё равно выдать?','Выдать'))return;
+el.disabled=true;try{if(c=='new'){const nm=$('#inm').value.trim();if(!nm)throw 'Укажите ФИО клиента';c=(await act('client',{name:nm,phone:$('#iph').value})).id}
+const f=$('#if').value;const r=await act('issue',{client:c,bike:b,type:IS.type,price:+$('#ip').value,first:f?+f:null,free:$('#ifr').checked,payn:IS.pay=='no'?0:IS.n,method:IS.pay,contract:$('#icn').value});
+hap('success');for(const k in IS)delete IS[k];await load();V=[['today'],['rent',r.id]];navDir='fw';render();toast('Велосипед выдан')}catch(e){el.disabled=false;if(e!==ABORT)uiAlert(String(e))}}
+/* ---------- Парк */
+function util(b,from,to){const own=[b.bought&&b.bought>from?b.bought:from,b.gone&&b.gone<to?b.gone:to];if(own[1]<own[0])return null;const tot=diff(own[1],own[0])+1;let busy=new Set();
+for(const r of K('rent').filter(r=>r.bike==b.id)){const a=(r.issued||r.start)>own[0]?(r.issued||r.start):own[0],z=(r.status=='active'?TODAY():(r.closed||r.issued))<own[1]?(r.status=='active'?TODAY():(r.closed||r.issued)):own[1];for(let d=a;d<=z;d=addD(d,1))busy.add(d)}
+return Math.round(busy.size/tot*100)}
+function park(){const all=K('bike'),live=all.filter(b=>!['sold','off'].includes(b.status)),cnt=k=>live.filter(b=>bstat(b)==k).length,t=TODAY(),f30=addD(t,-29);
+let L=PF=='all'?live:PF=='arch'?all.filter(b=>['sold','off'].includes(b.status)):live.filter(b=>bstat(b)==PF);L.sort((a,b)=>(a.num||'').localeCompare(b.num||'','ru',{numeric:true}));
+return hd('Парк',`${live.length} ${live.length==1?'велосипед':live.length<5?'велосипеда':'велосипедов'}`,can('bikes')?`<button class=ib onclick="bikeF()" aria-label="Добавить">${ic('plus')}</button>`:'')+
+`<div class=stt style="grid-template-columns:repeat(3,1fr)"><div><b>${cnt('free')}</b><span>свободно</span></div><div><b>${cnt('rent')}</b><span>в аренде</span></div><div><b>${cnt('repair')}</b><span>в ремонте</span></div></div>
+<div class=seg>${[['all','Все'],['free','Свободны'],['rent','В аренде'],['repair','Ремонт'],['arch','Архив']].map(([k,n])=>`<button class="${PF==k?'on':''}" onclick="PF='${k}';render()">${n}</button>`).join('')}</div>`+
+(L.length?`<div class=grp>${L.map(b=>{const s=bstat(b),r=b.rent&&G('rent',b.rent),u=util(b,f30,t);return `<button class=row onclick="go('bike','${b.id}')"><span class="gl ${BS[s][1]}">${ic('bike')}</span><span class=tx><b>${esc((b.num?b.num+' · ':'')+b.name)}</b><span>${r?esc(cname(r.client))+' · до '+fmt(r.st.until).slice(0,5):BS[s][0]}${u!=null&&!['sold','off'].includes(s)?` · загрузка ${u}%`:''}</span></span><span class=rt>${chip(r&&r.st.late>0?'просрочка':BS[s][0],r&&r.st.late>0?'t-er':BS[s][1])}</span></button>`}).join('')}</div>`:`<div class=grp>${empty('Нет велосипедов','bike')}</div>`)}
+function bstats(b,from,to){const inP=d=>(!from||d>=from)&&(!to||d<=to),cf=S.cfg;let inc=0,qr=0,ref=0;
+for(const r of K('rent').filter(r=>r.bike==b.id)){for(const p of r.pays||[])if(inP(p.ts.slice(0,10))){inc+=p.amt;if(p.method=='qr')qr+=p.amt}if(r.refund&&inP(r.refund.date))ref+=r.refund.amt}
+const ex=K('exp').filter(e=>e.bike==b.id&&inP(e.date)).reduce((a,e)=>a+e.amt,0),tax=(inc-ref)*(cf.tax||0)/100,acq=qr*(cf.acq||0)/100,sale=b.sale&&inP(b.sale.date)?b.sale.amt:0;
+return {inc,ref,ex,tax,acq,sale,net:inc-ref-tax-acq-ex}}
+function bike(id){const b=G('bike',id);if(!b)return bk()+empty('Не найден');const s=bstat(b),r=b.rent&&G('rent',b.rent),t=TODAY();
+let h=bk()+`<div class=dh><div>${chip(BS[s][0],BS[s][1])}</div><h1>${esc(b.name)}</h1><div class=mu>${esc(b.num||'')}${b.vin?' · VIN '+esc(b.vin):''}</div></div>`;
+if(r)h+=`<div class=grp>${rentRow(r)}</div>`;
+if(fin()){const a=bstats(b),pb=b.cost?Math.round((a.net+a.sale)/b.cost*100):null;
+h+=`<div class=card><div class=sm>Окупаемость</div><div class=big>${pb==null?'—':pb+'%'}</div>${pb!=null?`<div class=bars><div class=br style="grid-template-columns:1fr"><i><u style="width:${Math.min(100,Math.max(0,pb))}%;${pb>=100?'background:var(--go)':''}"></u></i></div></div>`:''}
+<div class=sm>${pb==null?'Укажите закупочную цену':pb>=100?`Окупился, сверху ${m(a.net+a.sale-b.cost)}`:`Осталось ${m(b.cost-a.net-a.sale)}`}</div></div>
+<div class=card>${kv('Закупка',b.cost?m(b.cost):'—')}${kv('Куплен',b.bought?fmt(b.bought):'—')}${kv('Получено за аренду',m(a.inc))}${a.ref?kv('Возвраты клиентам','−'+m(a.ref)):''}${kv('Налог и эквайринг','−'+m(a.tax+a.acq))}${kv('Расходы на велосипед','−'+m(a.ex))}${kv('Чистая прибыль',m(a.net))}${a.sale?kv('Продан за',m(a.sale)):''}${kv('Загрузка за 30 дней',(util(b,addD(t,-29),t)??'—')+'%')}${kv('Загрузка за всё время',(util(b,b.bought||'2000-01-01',t)??'—')+'%')}</div>`}
+else h+=`<div class=card>${kv('Куплен',b.bought?fmt(b.bought):'—')}</div>`;
+if(b.note)h+=`<div class="card sm">${tx2(b.note)}</div>`;
+const A=[];if(can('bikes'))A.push(`<button class="btn sec" onclick="bikeF('${id}')">${ic('edit','s')}Изменить</button>`,`<button class="btn sec" onclick="bstatS('${id}')">${ic('swap','s')}Статус</button>`);if(can('exp'))A.push(`<button class="btn sec" onclick="expF(null,'${id}')">${ic('receipt','s')}Расход</button>`);
+if(A.length)h+=`<div class=acts>${A.join('')}</div>`;
+const RS=K('rent').filter(x=>x.bike==id).sort((a,b)=>(b.issued||'').localeCompare(a.issued||''));
+h+=`<h2 class=sec>Аренды</h2>`+(RS.length?`<div class=grp>${RS.map(x=>`<button class="row nl" onclick="go('rent','${x.id}')"><span class=tx><b>${esc(cname(x.client))}</b><span>${fmt(x.issued||x.start)} – ${x.status=='active'?'сейчас':fmt(x.closed||'')}${x.status=='seized'?' · изъят':''}</span></span><span class=rt><b>${m((x.pays||[]).reduce((a,p)=>a+p.amt,0))}</b></span></button>`).join('')}</div>`:`<div class=grp>${empty('Аренд ещё не было')}</div>`);
+const EX=K('exp').filter(e=>e.bike==id).sort((a,b)=>b.date.localeCompare(a.date));
+if(EX.length)h+=`<h2 class=sec>Расходы</h2><div class=grp>${EX.map(expRow).join('')}</div>`;
+return h}
+async function bikeF(id){const b=id?G('bike',id):{};await sheet(`<h3>${id?'Велосипед':'Новый велосипед'}</h3><div class=f2><label class=fld><span>Номер</span><input id=bn value="${esc(b.num||'')}" placeholder="B9"></label><label class=fld><span>VIN</span><input id=bv value="${esc(b.vin||'')}"></label></div>
+<label class=fld><span>Название</span><input id=bm value="${esc(b.name||'')}"></label>${fin()?`<div class=f2><label class=fld><span>Закупка, ₽</span><input id=bc type=number inputmode=numeric value="${b.cost||''}"></label><label class=fld><span>Дата покупки</span><input id=bd type=date value="${b.bought||''}"></label></div>`:''}
+<label class=fld><span>Заметка</span><textarea id=bt>${esc(b.note||'')}</textarea></label><button class="btn blk lg" data-y>Сохранить</button><button class="btn sec blk" data-n>Отмена</button>`,(o,d)=>{o.querySelector('[data-n]').onclick=()=>d();
+o.querySelector('[data-y]').onclick=async()=>{const q=s=>o.querySelector(s);try{const r=await act('bike',{id,v:b._v,num:q('#bn').value,vin:q('#bv').value,name:q('#bm').value,cost:q('#bc')?+q('#bc').value:undefined,bought:q('#bd')?q('#bd').value:undefined,note:q('#bt').value,point:b.point||''});d();await load();if(!id)go('bike',r.id);else render(true);toast('Сохранено')}catch(e){uiAlert(e)}}})}
+async function bstatS(id){const b=G('bike',id);if(b.rent)return uiAlert('Велосипед сейчас в аренде. Сначала оформите возврат.');
+const x=await uiPick('Статус велосипеда',['Свободен','В ремонте','Продан','Списан (кража, поломка)']);if(!x)return;const st={'Свободен':'free','В ремонте':'repair','Продан':'sold'}[x]||'off';let amt=0;
+if(st=='sold'){const a=await uiPrompt('За сколько продан, ₽?','');if(a==null)return;amt=+a}
+if(st=='off'&&!await uiConfirm('Велосипед уйдёт в архив. Его недоокупленная часть будет видна как убыток.','Списать',{danger:true}))return;
+doAct('bikestat',{id,status:st,amt,v:b._v},'Статус изменён').catch(()=>{})}
+/* ---------- Клиенты */
+function clients(){const L=K('client').filter(c=>!QS||(c.name+' '+(c.phone||'')).toLowerCase().includes(QS.toLowerCase())).sort((a,b)=>a.name.localeCompare(b.name,'ru'));
+return bk()+hd('Клиенты',`${K('client').length}`,can('clients')?`<button class=ib onclick="clientF()" aria-label="Добавить">${ic('plus')}</button>`:'')+`<div class=srch>${ic('search','s')}<input id=qs placeholder="Поиск по имени или телефону" value="${esc(QS)}" oninput="QS=this.value;clearTimeout(window.qst);window.qst=setTimeout(()=>{render(true);const e=$('#qs');e.focus();e.setSelectionRange(e.value.length,e.value.length)},250)"></div>`+
+(L.length?`<div class=grp>${L.map(c=>{const r=rentOf('client',c.id),debt=K('rent').filter(x=>x.client==c.id&&x.status!='active').reduce((a,x)=>a+(x.debt||0),0);return `<button class=row onclick="go('client','${c.id}')"><span class="av ${r?'t-bl':''}">${esc(ini(c.name))}</span><span class=tx><b>${esc(c.name)}</b><span>${esc(c.phone||'')}${r?' · '+esc(bnum(r.bike)):''}</span></span><span class=rt>${c.black?chip('чёрный список','t-er'):''}${debt?chip('долг '+m(debt),'t-er'):r?chip('аренда','t-bl'):''}</span></button>`}).join('')}</div>`:`<div class=grp>${empty('Никого не нашли','users')}</div>`)}
+function client(id){const c=G('client',id);if(!c)return bk()+empty('Не найден');const r=rentOf('client',id),RS=K('rent').filter(x=>x.client==id).sort((a,b)=>(b.issued||'').localeCompare(a.issued||'')),debt=RS.filter(x=>x.status!='active').reduce((a,x)=>a+(x.debt||0),0);
+let h=bk()+`<div class=dh><div>${c.black?chip('чёрный список','t-er'):''}</div><h1>${esc(c.name)}</h1><div class=ph>${esc(c.phone||'')}</div>
+<div class=acts>${c.phone?`<a class="btn sec" href="tel:${esc(c.phone)}">${ic('phone','s')}Позвонить</a>`:''}${can('clients')?`<button class="btn sec" onclick="invite('${id}')">${ic('link','s')}Ссылка для входа</button>`:''}</div></div>`;
+if(c.black&&c.bnote)h+=`<div class="note t-er">${ic('alert','s')}<div>${tx2(c.bnote)}</div></div>`;
+if(debt)h+=`<div class="note t-er">${ic('alert','s')}<div><b>Долг ${m(debt)}</b> по закрытым арендам</div></div>`;
+if(r)h+=`<h2 class=sec>Текущая аренда</h2><div class=grp>${rentRow(r)}</div>`;
+h+=`<div class=card>${kv('Договор',esc(c.contract||'—')+(c.cdate?' от '+fmt(c.cdate):''))}${kv('Откуда пришёл',esc(c.src||'—'))}${kv('Всего оплатил',m(RS.reduce((a,x)=>a+(x.pays||[]).reduce((s,p)=>s+p.amt,0),0)))}</div>`;
+if(c.note)h+=`<div class="card sm">${tx2(c.note)}</div>`;
+if(can('clients'))h+=`<div class=acts><button class="btn sec" onclick="clientF('${id}')">${ic('edit','s')}Изменить</button><button class="btn ${c.black?'sec':'dng'}" onclick="blackS('${id}')">${ic('flag','s')}${c.black?'Убрать из чёрного списка':'В чёрный список'}</button><button class="btn sec" onclick="unbind('${id}')">${ic('x','s')}Сбросить вход</button></div>`;
+h+=`<h2 class=sec>История аренд</h2>`+(RS.length?`<div class=grp>${RS.map(x=>`<button class="row nl" onclick="go('rent','${x.id}')"><span class=tx><b>${esc(bfull(x.bike))}</b><span>${fmt(x.issued||x.start)} – ${x.status=='active'?'сейчас':fmt(x.closed||'')}${x.status=='seized'?' · изъят':''}${x.debt?' · долг '+m(x.debt):''}</span></span><span class=rt><b>${m((x.pays||[]).reduce((a,p)=>a+p.amt,0))}</b></span></button>`).join('')}</div>`:`<div class=grp>${empty('Аренд ещё не было')}</div>`);
+return h}
+async function clientF(id){const c=id?G('client',id):{};await sheet(`<h3>${id?'Клиент':'Новый клиент'}</h3><label class=fld><span>ФИО</span><input id=cn value="${esc(c.name||'')}"></label><label class=fld><span>Телефон</span><input id=cp type=tel inputmode=tel value="${esc(c.phone||'')}" placeholder="+7"></label>
+<div class=f2><label class=fld><span>Договор №</span><input id=cc value="${esc(c.contract||'')}"></label><label class=fld><span>Дата договора</span><input id=cd type=date value="${esc(c.cdate||'')}"></label></div>
+<label class=fld><span>Откуда пришёл</span><input id=cs value="${esc(c.src||'')}" placeholder="Авито, знакомые…"></label><label class=fld><span>Заметка</span><textarea id=ct>${esc(c.note||'')}</textarea></label>
+<button class="btn blk lg" data-y>Сохранить</button><button class="btn sec blk" data-n>Отмена</button>`,(o,d)=>{o.querySelector('[data-n]').onclick=()=>d();
+o.querySelector('[data-y]').onclick=async()=>{const q=s=>o.querySelector(s).value;try{const r=await act('client',{id,v:c._v,name:q('#cn'),phone:q('#cp'),contract:q('#cc'),cdate:q('#cd'),src:q('#cs'),note:q('#ct')});d();await load();if(!id)go('client',r.id);else render(true);toast('Сохранено')}catch(e){uiAlert(e)}}})}
+async function blackS(id){const c=G('client',id);if(c.black){if(await uiConfirm('Убрать клиента из чёрного списка?','Убрать'))doAct('black',{id,on:false},'Готово').catch(()=>{});return}
+await sheet(`<h3>В чёрный список</h3><p>При новой выдаче приложение предупредит.</p><label class=fld><span>Причина</span><textarea id=bn></textarea></label><button class="btn dng blk" data-y>Добавить</button><button class="btn sec blk" data-n>Отмена</button>`,(o,d)=>{o.querySelector('[data-n]').onclick=()=>d();o.querySelector('[data-y]').onclick=()=>doAct('black',{id,on:true,note:o.querySelector('#bn').value},'Добавлен в чёрный список').finally(()=>d()).catch(()=>{})})}
+async function invite(cid){try{const r=await api('/api/invite',{client:cid}),link=`https://t.me/${r.bot}?startapp=${r.tok}`;
+await sheet(`<h3>Ссылка для входа</h3><p>Действует 7 дней, один раз. При входе спросим номер телефона из карточки.</p><input id=lk readonly value="${esc(link)}"><button class="btn blk" data-c>${ic('copy','s')}Скопировать</button><button class="btn sec blk" data-s>${ic('send','s')}Отправить в Telegram</button><button class="btn sec blk" data-x>Закрыть</button>`,(o,d)=>{
+o.querySelector('[data-x]').onclick=()=>d();o.querySelector('[data-s]').onclick=()=>T.openTelegramLink('https://t.me/share/url?url='+encodeURIComponent(link));
+o.querySelector('[data-c]').onclick=async()=>{try{await navigator.clipboard.writeText(link);toast('Ссылка скопирована')}catch(e){o.querySelector('#lk').select()}}},null)}catch(e){uiAlert('Не удалось создать ссылку: '+e)}}
+async function unbind(cid){if(await uiConfirm('Клиенту понадобится новая ссылка для входа.','Сбросить',{title:'Сбросить вход?'})){await api('/api/unbind',{client:cid});toast('Вход сброшен')}}
+/* ---------- Финансы */
+const MN=['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'];
+function range(){const t=TODAY();if(FIN.mode=='all')return [null,null,'Всё время'];
+if(FIN.mode=='y'){const y=+t.slice(0,4)+FIN.off;return [`${y}-01-01`,`${y}-12-31`,String(y)]}
+const d=new Date(t.slice(0,7)+'-01T00:00:00Z');d.setUTCMonth(d.getUTCMonth()+FIN.off);const a=d.toISOString().slice(0,10);d.setUTCMonth(d.getUTCMonth()+1);d.setUTCDate(0);
+const z=d.toISOString().slice(0,10);return [a,z,`${MN[+a.slice(5,7)-1]} ${a.slice(0,4)}`]}
+function money(from,to){const inP=d=>(!from||d>=from)&&(!to||d<=to),cf=S.cfg;let inc=0,qr=0,ref=0,wo=0,pen=0;const pays=[];
+for(const r of K('rent')){for(const p of r.pays||[]){const d=p.ts.slice(0,10);if(inP(d)){inc+=p.amt;pen+=p.pen||0;if(p.method=='qr')qr+=p.amt;pays.push({d,a:p.amt})}}
+if(r.refund&&inP(r.refund.date)){ref+=r.refund.amt;pays.push({d:r.refund.date,a:-r.refund.amt})}if(r.writeoff&&inP(r.closed))wo+=r.writeoff}
+const ex=K('exp').filter(e=>inP(e.date)),exs=ex.reduce((a,e)=>a+e.amt,0),tax=(inc-ref)*(cf.tax||0)/100,acq=qr*(cf.acq||0)/100;
+const buy=K('bike').filter(b=>b.bought&&inP(b.bought)).reduce((a,b)=>a+(b.cost||0),0),sale=K('bike').filter(b=>b.sale&&inP(b.sale.date)).reduce((a,b)=>a+b.sale.amt,0);
+return {inc,qr,ref,wo,pen,tax,acq,ex,exs,net:inc-ref-tax-acq-exs,buy,sale,pays}}
+function bars(rows,fmtv=m){const mx=Math.max(1,...rows.map(r=>Math.abs(r[1])));return `<div class=bars>${rows.map(([l,v,on])=>`<div class=br ${on?`onclick="${on}" style="cursor:pointer"`:''}><span>${esc(l)}</span><i><u style="width:${Math.max(0,v)/mx*100}%"></u></i><b>${fmtv(v)}</b></div>`).join('')}</div>`}
+function finS(){const tabs=[];if(fin())tabs.push(['an','Аналитика']);if(can('exp')||fin())tabs.push(['ex','Расходы']);if(!tabs.find(x=>x[0]==FT))FT=tabs[0][0];
+return hd('Финансы')+`<div class=seg>${tabs.map(([k,n])=>`<button class="${FT==k?'on':''}" onclick="FT='${k}';render()">${n}</button>`).join('')}</div>`+(FT=='an'?analytics():expenses())}
+function analytics(){const[a,z,lbl]=range(),M=money(a,z),cf=S.cfg;
+let h=`<div class=seg>${[['m','Месяц'],['y','Год'],['all','Всё время']].map(([k,n])=>`<button class="${FIN.mode==k?'on':''}" onclick="FIN={mode:'${k}',off:0};render()">${n}</button>`).join('')}</div>`;
+if(FIN.mode!='all')h+=`<div style="display:flex;align-items:center;justify-content:space-between;margin:4px 16px"><button class=ib onclick="FIN.off--;render()">${ic('left')}</button><b style="font-size:18px">${esc(lbl)}</b><button class=ib onclick="FIN.off++;render()" ${FIN.off>=0?'disabled style="opacity:.3"':''}>${ic('right')}</button></div>`;
+h+=`<div class="card tint"><div class=sm>Чистая прибыль</div><div class=big style="color:${M.net<0?'var(--ert)':'var(--pine)'}">${m(M.net)}</div><div class=sm>после налога, эквайринга и всех расходов</div></div>
+<div class=card>${kv('Получено',m(M.inc))}${M.pen?kv('в том числе неустойка',m(M.pen)):''}${M.ref?kv('Возвраты клиентам','−'+m(M.ref)):''}${kv(`Налог ${cf.tax}%`,'−'+m(M.tax))}${kv(`Эквайринг ${cf.acq}% (с QR)`,'−'+m(M.acq))}${kv('Расходы','−'+m(M.exs))}${kv('Чистая прибыль',m(M.net))}</div>
+<div class=card>${kv('Закупка велосипедов',m(M.buy))}${M.sale?kv('Продажа велосипедов',m(M.sale)):''}${M.wo?kv('Недополучено (изъятия)',m(M.wo)):''}</div>`;
+// динамика
+let rows=[];if(FIN.mode=='m'){let s=a;while(s<=z){let e=s;while(e<z&&new Date(e+'T00:00:00Z').getUTCDay()!=0)e=addD(e,1);const v=M.pays.filter(p=>p.d>=s&&p.d<=e).reduce((x,p)=>x+p.a,0);rows.push([`${dnum(s)}–${dnum(e)}`,v]);s=addD(e,1)}}
+else{const ys=FIN.mode=='y'?[a.slice(0,4)]:[...new Set(M.pays.map(p=>p.d.slice(0,4)))].sort();for(const y of ys)for(let k=1;k<=12;k++){const p=`${y}-${String(k).padStart(2,'0')}`;if(p>TODAY().slice(0,7))break;const v=M.pays.filter(x=>x.d.startsWith(p)).reduce((s,x)=>s+x.a,0);if(FIN.mode=='all'&&!v&&!rows.length)continue;
+const off=(+y-+TODAY().slice(0,4))*12+k-+TODAY().slice(5,7);rows.push([`${MN[k-1].slice(0,3)}${FIN.mode=='all'?' '+y.slice(2):''}`,v,`FIN={mode:'m',off:${off}};render()`])}}
+h+=`<h2 class=sec>Получено по ${FIN.mode=='m'?'неделям':'месяцам'}</h2><div class=card>${rows.length?bars(rows):empty('Нет данных')}</div>`;
+const cats={};for(const e of M.ex)cats[e.cat]=(cats[e.cat]||0)+e.amt;const cr=Object.entries(cats).sort((x,y)=>y[1]-x[1]);
+if(cr.length)h+=`<h2 class=sec>Расходы по категориям</h2><div class=card>${bars(cr)}</div>`;
+const bl=K('bike').map(b=>{const s=bstats(b,a,z),u=util(b,a||b.bought||'2000-01-01',z&&z<TODAY()?z:TODAY()),al=bstats(b);return {b,s,u,pb:b.cost?Math.round((al.net+al.sale)/b.cost*100):null}}).filter(x=>x.s.inc||x.s.ex||!['sold','off'].includes(x.b.status)).sort((x,y)=>y.s.net-x.s.net);
+h+=`<h2 class=sec>По велосипедам</h2><div class=grp>${bl.map(x=>`<button class="row nl" onclick="go('bike','${x.b.id}')"><span class=tx><b>${esc((x.b.num?x.b.num+' · ':'')+x.b.name)}</b><span>загрузка ${x.u??'—'}% · окупаемость ${x.pb??'—'}%${x.s.ex?' · расходы '+m(x.s.ex):''}</span></span><span class=rt><b style="${x.s.net<0?'color:var(--ert)':''}">${m(x.s.net)}</b></span></button>`).join('')}</div>`;
+const gen=M.ex.filter(e=>!e.bike).reduce((s,e)=>s+e.amt,0);if(gen)h+=`<div class=sub>Общие расходы без привязки к велосипеду: ${m(gen)}. Они учтены в чистой прибыли выше, но не в строках велосипедов.</div>`;
+return h}
+const expRow=e=>`<button class="row nl" onclick="expF('${e.id}')"><span class=tx><b>${esc(e.title||e.cat)}</b><span>${fmt(e.date)} · ${esc(e.cat)}${e.bike?' · '+esc(bnum(e.bike)):' · общий'}</span></span><span class=rt><b>${m(e.amt)}</b></span></button>`;
+function expenses(){const E=K('exp').sort((a,b)=>b.date.localeCompare(a.date)),G2={};for(const e of E)(G2[e.date.slice(0,7)]=G2[e.date.slice(0,7)]||[]).push(e);
+return (can('exp')?`<div class=acts><button class="btn blk" onclick="expF()">${ic('plus','s')}Добавить расход</button></div>`:'')+(E.length?Object.entries(G2).map(([k,L])=>`<h2 class=sec>${MN[+k.slice(5,7)-1]} ${k.slice(0,4)} <span class="mu sm" style="margin-left:auto;font-weight:600">${m(L.reduce((a,e)=>a+e.amt,0))}</span></h2><div class=grp>${L.map(expRow).join('')}</div>`).join(''):`<div class=grp>${empty('Расходов пока нет','receipt')}</div>`)}
+async function expF(id,bike){if(!can('exp'))return;const e=id?G('exp',id):{date:TODAY(),bike:bike||'',cat:S.cfg.cats[0]},bs=K('bike').sort((a,b)=>(a.num||'').localeCompare(b.num||'','ru',{numeric:true}));
+await sheet(`<h3>${id?'Расход':'Новый расход'}</h3><div class=f2><label class=fld><span>Сумма, ₽</span><input id=ea type=number inputmode=decimal value="${e.amt||''}"></label><label class=fld><span>Дата</span><input id=ed type=date value="${e.date}"></label></div>
+<label class=fld><span>Категория</span><select id=ec>${S.cfg.cats.concat(S.cfg.cats.includes(e.cat)?[]:[e.cat]).map(c=>`<option ${c==e.cat?'selected':''}>${esc(c)}</option>`).join('')}</select></label>
+<label class=fld><span>Электровелосипед</span><select id=eb><option value="">Общий расход (без велосипеда)</option>${bs.map(b=>`<option value="${b.id}" ${b.id==e.bike?'selected':''}>${esc((b.num?b.num+' · ':'')+b.name)}</option>`).join('')}</select></label>
+<label class=fld><span>Описание</span><input id=et value="${esc(e.title||'')}" placeholder="Например: ремонт заднего колеса"></label>
+<button class="btn blk lg" data-y>Сохранить</button>${id?`<button class="btn dng blk" data-d>Удалить</button>`:''}<button class="btn sec blk" data-n>Отмена</button>`,(o,d)=>{const q=s=>o.querySelector(s).value;o.querySelector('[data-n]').onclick=()=>d();
+o.querySelector('[data-y]').onclick=()=>doAct('exp',{id,v:e._v,amt:+q('#ea'),date:q('#ed'),cat:q('#ec'),bike:q('#eb'),title:q('#et')},'Расход сохранён').finally(()=>d()).catch(()=>{});
+const x=o.querySelector('[data-d]');if(x)x.onclick=async()=>{if(await uiConfirm('Удалить расход?','Удалить',{danger:true}))doAct('expdel',{id},'Удалено').finally(()=>d()).catch(()=>{})}})}
+/* ---------- Ещё */
+function more(){const unk=K('unk').filter(u=>u.status=='open').length,it=[['users','Клиенты','clients',`${K('client').length}`]];
+if(unk)it.push(['alert','Не распознанные платежи','unkL',String(unk)]);if(isOwner())it.push(['sliders','Настройки','settings',''],['shield','Администраторы','admins',`${K('admin').length}`],['down','Копии и перенос данных','backup',''],['list','Журнал изменений','logS','']);
+return hd('Ещё',ME.role=='admin'?ME.name:'Владелец')+`<div class=grp>${it.map(([i,n,s,r])=>`<button class=row onclick="go('${s}')"><span class=gl>${ic(i)}</span><span class=tx><b>${n}</b></span><span class=rt><span class=mu>${r}</span></span>${ic('right','s')}</button>`).join('')}</div>`}
+function unkL(){const U=K('unk').sort((a,b)=>b.ts.localeCompare(a.ts));return bk()+hd('Не распознано')+`<div class=sub style="margin:0 22px 8px">Платежи по QR, которые не удалось засчитать автоматически: оплатили не в тот день, после изменений в аренде или повторно.</div>`+(U.length?`<div class=grp>${U.map(u=>{const r=G('rent',u.rent)||{};return `<button class=row onclick="unkS('${u.id}')"><span class="gl ${u.status=='open'?'t-er':'t-n'}">${ic(u.status=='open'?'alert':'check')}</span><span class=tx><b>${m(u.amt)}</b><span>${esc(r.client?cname(r.client):'')} · ${fmt(u.ts.slice(0,10))}${u.status!='open'?' · разобрано':''}</span></span></button>`}).join('')}</div>`:`<div class=grp>${empty('Всё разобрано','check')}</div>`)}
+async function unkS(id){const u=G('unk',id),r=G('rent',u.rent);if(u.status!='open')return uiAlert(u.status=='applied'?'Платёж засчитан в аренду.':'Отмечено как разобранное. '+(u.note||''));
+await sheet(`<h3>Платёж ${m(u.amt)}</h3><p>${esc(u.why||'')}. Клиент: ${esc(r?cname(r.client):'—')}.</p>${r&&r.status=='active'?`<label class=fld><span>Засчитать как оплату периодов</span>${seg('n',[[1,'1'],[2,'2'],[3,'3']],1)}</label><button class="btn blk" data-a>Засчитать в аренду</button>`:r&&r.debt?`<button class="btn blk" data-a>Засчитать в долг</button>`:''}
+<label class=fld><span>Или отметить как разобранный (например, вернули деньги)</span><input id=un placeholder="Комментарий"></label><button class="btn sec blk" data-d>Разобрано</button><button class="btn sec blk" data-n>Отмена</button>`,(o,d)=>{wireSeg(o);o.querySelector('[data-n]').onclick=()=>d();
+const a=o.querySelector('[data-a]');if(a)a.onclick=()=>doAct('unk',{id,do:'apply',rent:u.rent,n:r.status=='active'?+segv(o,'n'):0},'Засчитано').finally(()=>d()).catch(()=>{});
+o.querySelector('[data-d]').onclick=()=>doAct('unk',{id,do:'done',note:o.querySelector('#un').value},'Отмечено').finally(()=>d()).catch(()=>{})})}
+function settings(){const c=S.cfg,t=c.tochka||{};const f=(id,l,v,ty='number')=>`<label class=fld><span>${l}</span><input id=${id} type=${ty} inputmode=decimal value="${esc(v)}"></label>`;
+return bk()+hd('Настройки')+`<div class=form><h3>Тарифы по умолчанию</h3><div class=f2>${f('sw','Неделя, ₽',c.week)}${f('sm','Месяц, ₽',c.month)}</div>
+<h3>Неустойка и отсрочки</h3><div class=f2>${f('sp','Неустойка, % в день',c.pen)}${f('sd','Отсрочка по заявке клиента, макс. дней (0–3)',c.cdef)}</div>
+<h3>Налог и эквайринг</h3><div class=f2>${f('st','Налог, %',c.tax)}${f('sa','Эквайринг по QR, %',c.acq)}</div>
+<h3>Категории расходов</h3><textarea id=sc rows=6>${esc(c.cats.join('\n'))}</textarea><div class=sub style="margin:6px 4px">По одной на строке.</div>
+<h3>Оплата по QR (Точка)</h3><div class="note ${t.on?'t-ok':'t-wa'}" style="margin:8px 0">${ic(t.on?'check':'alert','s')}<div>${t.on?'Подключено: QR выставляются, оплаты отмечаются сами.':'Не подключено. Пока оплату отмечаете вручную.'}</div></div>
+${f('tm','ID торговой точки (merchantId)',t.merchant||'','text')}${f('ta','ID счёта (accountId)',t.account||'','text')}<label class=fld><span>JWT-токен из интернет-банка Точки</span><input id=tj type=password placeholder="${t.jwt?'сохранён — оставьте пустым, чтобы не менять':'вставьте токен'}"></label>
+${t.hook?`<div class=sub style="margin:8px 4px">Адрес для вебхука в Точке: <br><b style="word-break:break-all">${esc(location.origin+'/hook/tochka/'+t.hook)}</b></div>`:''}
+<h3>Уведомления в Telegram</h3><div class=card style="margin:8px 0;padding:0"><label class=sw><span class=tx><b>Сообщения мне</b><span>Сводка в 10:00, заявки на отсрочку, оплаты по QR</span></span><input type=checkbox id=no ${c.nown?'checked':''}></label>
+<label class=sw><span class=tx><b>Напоминания клиентам</b><span>Накануне и в день оплаты, в 10:00</span></span><input type=checkbox id=nc ${c.ncli?'checked':''}></label></div>
+<div class=sub style="margin:0 4px">Пока сервер не может достучаться до Telegram, сообщения не доходят. Приложение от этого не зависит.</div>
+<button class="btn blk lg" style="margin-top:20px" onclick="saveCfg(this)">Сохранить</button></div>`}
+async function saveCfg(el){const q=s=>$(s).value;el.disabled=true;try{await act('cfg',{week:+q('#sw'),month:+q('#sm'),pen:+q('#sp'),cdef:+q('#sd'),tax:+q('#st'),acq:+q('#sa'),cats:q('#sc').split('\n'),nown:$('#no').checked,ncli:$('#nc').checked,tochka:{merchant:q('#tm'),account:q('#ta'),jwt:q('#tj')}});hap('success');toast('Сохранено');await reload()}catch(e){uiAlert(e)}el.disabled=false}
+const PL=[['pay','Принимать оплаты','Отмечать оплату, выставлять QR'],['defer','Отсрочки','Давать отсрочки и решать по заявкам'],['rents','Выдача и возврат','Выдавать велосипеды, менять цену, принимать возврат'],['seize','Изъятие','Изымать велосипед с обнулением долга'],['clients','Клиенты','Добавлять, менять, давать ссылку для входа'],['bikes','Велосипеды','Добавлять, менять статус'],['exp','Расходы','Вносить и менять расходы'],['reports','Аналитика','Видеть прибыль, закупку и окупаемость']];
+function admins(){const A=K('admin');return bk()+hd('Администраторы','',`<button class=ib onclick="adminF()" aria-label="Добавить">${ic('plus')}</button>`)+(A.length?`<div class=grp>${A.map(a=>`<button class=row onclick="adminF('${a.id}')"><span class=av>${esc(ini(a.name))}</span><span class=tx><b>${esc(a.name)}</b><span>${esc(a.phone)} · ${a.tg?'вошёл':'ещё не входил'}</span></span><span class=rt>${a.disabled?chip('отключён'):''}</span></button>`).join('')}</div>`:`<div class=grp>${empty('Администраторов нет','shield')}</div>`)+`<div class=sub>Администратор входит по ссылке и номеру телефона. Права выбираете вы.</div>`}
+async function adminF(id){const a=id?G('admin',id):{perms:['pay','defer','rents','clients']};
+await sheet(`<h3>${id?esc(a.name):'Новый администратор'}</h3><label class=fld><span>Имя</span><input id=an value="${esc(a.name||'')}"></label><label class=fld><span>Телефон</span><input id=ap type=tel value="${esc(a.phone||'')}"></label>
+<div class=card style="margin:14px 0 0;padding:0;background:var(--fill)">${PL.map(([k,n,d])=>`<label class=sw><span class=tx><b>${n}</b><span>${d}</span></span><input type=checkbox data-p="${k}" ${(a.perms||[]).includes(k)?'checked':''}></label>`).join('')}
+${id?`<label class=sw><span class=tx><b>Отключить</b><span>Не сможет войти</span></span><input type=checkbox id=ad ${a.disabled?'checked':''}></label>`:''}</div>
+<button class="btn blk lg" data-y>Сохранить</button>${id?`<button class="btn sec blk" data-i>${ic('link','s')}Ссылка для входа</button><button class="btn dng blk" data-d>Удалить</button>`:''}<button class="btn sec blk" data-n>Отмена</button>`,(o,d)=>{o.querySelector('[data-n]').onclick=()=>d();
+o.querySelector('[data-y]').onclick=async()=>{try{const r=await act('admin',{id,name:o.querySelector('#an').value,phone:o.querySelector('#ap').value,perms:[...o.querySelectorAll('[data-p]:checked')].map(x=>x.dataset.p),disabled:!!(o.querySelector('#ad')||{}).checked});d();await reload();if(!id)invite('adm:'+r.id)}catch(e){uiAlert(e)}};
+const i=o.querySelector('[data-i]');if(i)i.onclick=()=>{d();invite('adm:'+id)};const x=o.querySelector('[data-d]');if(x)x.onclick=async()=>{if(await uiConfirm('Удалить администратора?','Удалить',{danger:true})){d();doAct('admindel',{id},'Удалён').catch(()=>{})}}})}
+function backup(){const b=ME.backup;return bk()+hd('Копии и перенос')+`<div class=card><b>Скачать копию</b><div class="sm mu" style="margin:6px 0 12px">Все данные одним файлом. Сервер и так сохраняет копию каждую ночь в 03:00.${b?'<br>Последний раз скачано: '+fmt(b.ts.slice(0,10)):''}</div><button class="btn blk" onclick="downloadBackup(this)">${ic('down','s')}Скачать копию</button></div>
+<div class=card><b>Загрузить из файла</b><div class="sm mu" style="margin:6px 0 12px">Файл переноса из старого сервиса или ранее скачанная копия. <b>Все текущие данные заменятся.</b> Перед этим сервер сохранит их в служебную копию.</div><label class="btn sec blk">${ic('up','s')}Выбрать файл<input type=file accept=".json,application/json" style="display:none" onchange="restoreFile(this)"></label></div>`}
+async function downloadBackup(el){const t=el.innerHTML;el.disabled=true;el.textContent='Готовлю…';try{const r=await api('/api/dl',{}),url=location.origin+r.url,name=`arenda-${TODAY()}.json`;
+if(T.downloadFile&&T.isVersionAtLeast&&T.isVersionAtLeast('8.0'))T.downloadFile({url,file_name:name});else{T.openLink?T.openLink(url):open(url);await uiAlert('Файл откроется в браузере и сохранится в «Загрузки».')}}catch(e){uiAlert('Не удалось подготовить копию: '+e)}el.disabled=false;el.innerHTML=t}
+async function restoreFile(el){const f=el.files[0];el.value='';if(!f)return;let b;try{b=JSON.parse(await f.text())}catch(e){return uiAlert('Не удалось прочитать файл.')}
+if(!b||b.v!=1||b.app!='rent'||!Array.isArray(b.docs))return uiAlert('Это не файл приложения аренды.');const n=k=>b.docs.filter(x=>x.kind==k).length;
+if(!await uiConfirm(`В файле: велосипедов ${n('bike')}, клиентов ${n('client')}, аренд ${n('rent')}, расходов ${n('exp')}.\nТекущие данные заменятся.`,'Загрузить',{danger:!ME.empty,title:'Загрузить данные?'}))return;
+try{const r=await api('/api/restore',b);ME=await api('/api/me');await load();V=[['today']];render();uiAlert('Загружено записей: '+r.docs,'Готово')}catch(e){uiAlert('Не удалось загрузить: '+e)}}
+const LA={issue:'Выдача',pay:'Оплата','pay-qr':'Оплата по QR',paydebt:'Долг погашен',paydel:'Платёж удалён',return:'Возврат',seize:'Изъятие',price:'Смена цены',defer:'Отсрочка',undefer:'Отсрочка снята',fix:'Дата оплаты',client:'Клиент',black:'Чёрный список',bike:'Велосипед',bikestat:'Статус велосипеда',exp:'Расход',expdel:'Расход удалён',cfg:'Настройки',admin:'Администратор',admindel:'Администратор удалён',restore:'Загрузка данных',req:'Заявка на отсрочку','req-new':'Новая заявка',qr:'QR выставлен','qr-paid':'QR оплачен','qr-void':'QR отменён',unk:'Не распознано',contract:'Договор','unk-apply':'Платёж засчитан'};
+let LOG=null;function logS(){if(!LOG){api('/api/log').then(l=>{LOG=l;render(true)});return bk()+hd('Журнал')+'<div class=spin></div>'}const L=LOG;LOG=null;
+return bk()+hd('Журнал','последние 300')+`<div class=grp>${L.map(([ts,a,id,o,n])=>{const[k,w]=a.split('@');let nm='';try{const d=JSON.parse(n||o||'{}');nm=d.name||(d.client?cname(d.client):'')||d.title||''}catch(e){}
+return `<div class="row nl" style="cursor:default;min-height:56px"><span class=tx><b>${esc(LA[k]||k)}${nm?' · '+esc(nm):''}</b><span>${fmt(ts.slice(0,10))} ${ts.slice(11,16)}${w?' · '+esc(w):''}</span></span></div>`}).join('')}</div>`}
+/* ---------- клиент */
+let CQ=null;
+function cui(){const R=ME.rent;$('#nav').style.display='none';let h=`<div class=hd><div><small>Аренда электровелосипеда</small><h1>${esc((ME.name||'').split(' ').slice(1,2).join(' ')||ME.name||'Здравствуйте')}</h1></div></div>`;
+if(!R){h+=ME.debt?`<div class="cn"><div class=mu>Долг по прошлой аренде</div><div class=big style="color:var(--ert)">${m(ME.debt)}</div><div class=mu>Свяжитесь с владельцем для оплаты.</div></div>`:`<div class=center>${ic('bike','l')}<h1>Аренды сейчас нет</h1><p>Когда вам выдадут велосипед, здесь появятся сроки и оплата.</p></div>`;$('#app').innerHTML=h;return}
+const s=R.st;h+=`<div class="cb ${s.late>0?'t-er':s.left<=1?'t-wa':'t-ok'}"><span class=gl>${ic(s.late>0?'alert':'bike')}</span><span>${s.late>0?`Просрочка ${s.late} ${dayWord(s.late)}`:s.left==0?'Сегодня день оплаты':`Оплачено до ${dshort(s.until)}`}</span></div>
+<div class=cn><div class=mu>${esc(R.num?R.num+' · ':'')}${esc(R.bike)}</div>${s.late>0?`<div class=big style="color:var(--ert);margin-top:6px">${m(s.debt)}</div><div class=mu>${s.pen?`в том числе неустойка ${m(s.pen)} (${ME.pen}% в день)`:''}</div>`:
+`<div class=mid style="margin-top:6px">Следующая оплата ${dshort(s.next)}</div><div class=mu>${m(s.nprice)} за ${TY[s.ntype]} · ${rel(s.left)}</div>`}${s.defer?`<div class=hint>${ic('clock','s')} Отсрочка без неустойки до ${dshort(s.defer)}</div>`:''}</div>
+<div class=cp>${ME.qr?`<button class=tl onclick="cPay()"><span class=gl>${ic('receipt')}</span><span>Оплатить по QR</span>${ic('right','s')}</button>`:`<div class="note t-n" style="margin:12px 0 0">${ic('receipt','s')}<div>Оплата по QR скоро появится. Пока оплачивайте так, как договорились с владельцем.</div></div>`}
+${R.req?`<div class="note t-wa" style="margin:12px 0 0">${ic('clock','s')}<div>Заявка на отсрочку ${R.req.days} ${dayWord(R.req.days)} отправлена. Ждём решения.</div></div>`:ME.cdef>0?`<button class=tl onclick="cReq()"><span class=gl>${ic('clock')}</span><span>Попросить отсрочку</span>${ic('right','s')}</button>`:''}</div>
+<h2 class=sec>Платежи</h2>${R.pays.length?`<div class=grp>${R.pays.slice().reverse().map(p=>`<div class="row nl" style="cursor:default;min-height:56px"><span class=tx><b>${m(p.amt)}</b><span>${fmt(p.ts.slice(0,10))} · ${MT[p.method]||p.method}${p.pen?' · неустойка '+m(p.pen):''}</span></span></div>`).join('')}</div>`:`<div class=grp>${empty('Платежей пока нет')}</div>`}
+${ME.debt?`<div class="note t-er">${ic('alert','s')}<div>Долг по прошлой аренде: <b>${m(ME.debt)}</b></div></div>`:''}`;
+$('#app').innerHTML=h}
+async function cPay(){const R=ME.rent,pn=R.st.ntype=='w'?[1,2,3,4]:[1,2,3];
+await sheet(`<h3>Оплата аренды</h3><p>Сумма считается на сегодня вместе с неустойкой, если есть. QR действует до конца дня.</p><label class=fld><span>За сколько ${R.st.ntype=='w'?'недель':'месяцев'}</span>${seg('n',pn.map(k=>[k,String(k)]),Math.max(1,Math.min(R.st.due_n||1,pn.length)))}</label>
+<div class=pv><div class=sm>К оплате</div><div class=big id=qa>…</div><div class=sm id=qd></div></div><button class="btn blk lg" data-y disabled>Получить QR</button><button class="btn sec blk" data-n>Отмена</button>`,(o,d)=>{
+const upd=async()=>{o.querySelector('[data-y]').disabled=true;try{const q=await api('/api/c',{a:'quote',n:+segv(o,'n')});o.querySelector('#qa').textContent=m(q.amt);o.querySelector('#qd').textContent=`оплата по ${fmt(q.to)}${q.pen?' · неустойка '+m(q.pen):''}`;o.querySelector('[data-y]').disabled=false}catch(e){o.querySelector('#qd').textContent=e}};
+wireSeg(o,upd);upd();o.querySelector('[data-n]').onclick=()=>d();
+o.querySelector('[data-y]').onclick=async()=>{try{const r=await api('/api/c',{a:'qr',n:+segv(o,'n')});d();await showQR(r.qr,'Оплата аренды',1);ME=await api('/api/me');cui()}catch(e){uiAlert(e)}}})}
+async function cReq(){const n=ME.cdef;await sheet(`<h3>Отсрочка</h3><p>Попросите перенести оплату без неустойки. Владелец одобрит или отклонит заявку.</p><label class=fld><span>На сколько дней</span>${seg('d',Array.from({length:n},(_,i)=>[i+1,String(i+1)]),Math.min(2,n))}</label>
+<button class="btn blk lg" data-y>Отправить заявку</button><button class="btn sec blk" data-n>Отмена</button>`,(o,d)=>{wireSeg(o);o.querySelector('[data-n]').onclick=()=>d();
+o.querySelector('[data-y]').onclick=async()=>{try{await api('/api/c',{a:'req',days:+segv(o,'d')});d();hap('success');toast('Заявка отправлена');ME=await api('/api/me');cui()}catch(e){uiAlert(e)}}})}
+const startParam=()=>{const u=T.initDataUnsafe||{};if(u.start_param)return u.start_param;const x=(location.search+'&'+location.hash.replace(/^#/,'')).match(/tgWebAppStartParam=([^&]+)/);return x?decodeURIComponent(x[1]):''};
+async function claim(tok){try{await api('/api/claim',{tok,phone:$('#ph').value});location.reload()}catch(e){uiAlert('Проверьте номер телефона и ссылку. Номер должен совпадать с тем, что записан у владельца.','Не удалось войти')}}
+/* ---------- запуск */
+const SCR={today,park,bike,rent,issue,clients,client,fin:finS,more,unkL,settings,admins,backup,logS};
+SCR.issue.after=()=>isUpd();
+(async()=>{if(!T.initData){$('#app').innerHTML=`<div class=center>${ic('lock','l')}<h1>Откройте в Telegram</h1><p>Приложение работает только внутри Telegram через бота.</p></div>`;return}
+try{ME=await api('/api/me')}catch(e){$('#app').innerHTML=`<div class=center>${ic('alert','l')}<h1>Нет связи</h1><p>Не удалось связаться с сервером. Попробуйте позже.</p></div>`;return}
+if(ME.role=='owner'||ME.role=='admin'){$('#nav').style.display='';await load();render();return}
+$('#nav').style.display='none';
+if(ME.role=='client')return cui();
+if(ME.role=='off'){$('#app').innerHTML=`<div class=center>${ic('lock','l')}<h1>Доступ отключён</h1><p>Обратитесь к владельцу.</p></div>`;return}
+const tok=startParam();$('#app').innerHTML=tok?`<div class=center>${ic('bike','l')}<h1>Вход</h1><p>Введите номер телефона, который вы сообщили при оформлении аренды.</p><div style="text-align:left"><input id=ph type=tel inputmode=tel placeholder="+7 900 000-00-00" autocomplete=tel></div><div class=acts style="margin:16px 0"><button class="btn blk lg" onclick="claim('${esc(tok)}')">Войти</button></div></div>`:
+`<div class=center>${ic('link','l')}<h1>Нужна ссылка</h1><p>Откройте ссылку для входа, которую прислал владелец.</p></div>`})();
+
+</script></body></html>
