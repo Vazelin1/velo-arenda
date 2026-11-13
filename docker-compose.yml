@@ -1,0 +1,8 @@
+services:
+  app:
+    build: .
+    restart: always
+    env_file: .env
+    volumes: ["./data:/data"]
+    networks: {web: {aliases: [rent]}}
+networks: {web: {external: true}}
