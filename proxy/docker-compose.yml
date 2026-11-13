@@ -1,0 +1,11 @@
+# Общий Caddy для обоих приложений: сам получает сертификаты и по адресу решает, куда отправить запрос.
+services:
+  caddy:
+    image: caddy:2
+    restart: always
+    ports: ["80:80","443:443"]
+    env_file: .env
+    volumes: ["./Caddyfile:/etc/caddy/Caddyfile","caddy:/data"]
+    networks: [web]
+volumes: {caddy: {}}
+networks: {web: {external: true}}

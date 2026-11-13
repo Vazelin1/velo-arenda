@@ -1,0 +1,6 @@
+{$VELO_DOMAIN} {
+  reverse_proxy velo:8080
+}
+{$RENT_DOMAIN} {
+  reverse_proxy rent:8080
+}
