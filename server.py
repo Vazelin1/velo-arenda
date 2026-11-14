@@ -16,11 +16,12 @@ HD={'X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','Strict-T
 KINDS=('cfg','admin','client','bike','rent','exp','qr','unk','req','bill')
 PERMS=('pay','partial','bill','defer','pen','rents','seize','clients','bikes','exp','reports')
 LEN={'w':7,'m':30}
-DEF={'week':3500,'month':11000,'pen':5,'grace':2,'ddays':3,'tax':7,'acq':0,'cdef':3,'nown':False,'ncli':False,
+DEF={'week':3500,'month':11000,'pen':5,'grace':2,'ddays':3,'archdays':30,'tax':7,'acq':0,'cdef':3,'nown':False,'ncli':False,
 'cats':['Ремонт','Запчасти','Обслуживание','Реклама','Зарплата','Аренда помещения','Прочее']}
 ID=re.compile(r'[a-z0-9]{1,16}')
 D=dt.date.fromisoformat
 class Bad(Exception):pass
+class Dup(Exception):pass
 def now():return dt.datetime.now(MSK)
 def today():return now().date()
 def nid():return secrets.token_hex(5)
@@ -299,8 +300,25 @@ def mine(cid):
     return {'role':'client','name':c.get('name',''),'rent':r,'debt':debt,'cdef':cf['cdef'],'pen':cf['pen'],'grace':cf['grace'],'qr':bool(tq()),'fio':c.get('name','')}
 # ---------- действия ----------
 NEED={'quote':'pay','issue':'rents','return':'rents','price':'rents','contract':'rents','pay':'pay','paydebt':'pay','qr':'pay','qrcancel':'pay','unk':'pay',
-'defer':'defer','undefer':'defer','nopen':'pen','waive':'pen','paypart':'partial','paydl':'pay','bill':'bill','billvoid':'bill','billpaid':'pay','req':'defer','seize':'seize','client':'clients','black':'clients','bike':'bikes','bikestat':'bikes','exp':'exp','expdel':'exp'}
-OWNERONLY={'cfg','admin','admindel','fix','paydel'}
+'defer':'defer','undefer':'defer','nopen':'pen','waive':'pen','paypart':'partial','paydl':'pay','bill':'bill','billvoid':'bill','billpaid':'pay','req':'defer','seize':'seize','client':'clients','black':'clients','archive':'clients','unarchive':'clients','bike':'bikes','bikestat':'bikes','exp':'exp','expdel':'exp'}
+OWNERONLY={'cfg','admin','admindel','fix','paydel','purge'}
+def archive(i,d,why,by,o):
+    """Клиент уходит в архив: скрыт из списков и выдачи, вход и ссылки сброшены. Аренды и платежи остаются."""
+    d['arch']=str(today());d['archwhy']=why;put(i,'client',d,'archive',by,o)
+    db.execute('delete from bind where client=?',(i,));db.execute('delete from inv where client=?',(i,))
+    for j,x in kind('req'):
+        if x.get('client')==i and x.get('status')=='pending':ox=dict(x);x['status']='no';put(j,'req',x,'req',by,ox)
+def autoarch(t):
+    """Ночью: клиенты без аренды дольше N дней (от возврата или от добавления) уходят в архив."""
+    n=int(cfg().get('archdays',30))
+    if n<=0:return
+    rs=kind('rent')
+    for i,c in kind('client'):
+        if c.get('arch'):continue
+        mine_=[r for _,r in rs if r.get('client')==i]
+        if any(r.get('status')=='active' for r in mine_):continue
+        last=max([c.get('created') or '2000-01-01']+[r.get('closed') or r.get('issued') or '' for r in mine_])
+        if D(last[:10])<=t-dt.timedelta(days=n):archive(i,c,'auto','',dict(c))
 def need_v(b,d):
     if b.get('v') is not None and b.get('v')!=d.get('_v'):raise Bad('Данные только что изменились. Обновите экран.')
 def get(k,i):
@@ -322,7 +340,28 @@ def act(a,b,ro,P,by):
         d=dict(old or {'created':str(t)})
         d.update(name=txt(b.get('name'),80),phone=txt(b.get('phone'),30),contract=txt(b.get('contract'),40),cdate=txt(b.get('cdate'),10),src=txt(b.get('src'),40),note=txt(b.get('note'),500))
         if not d['name']:raise Bad('Укажите ФИО')
+        ph=digits(d['phone'])
+        if ph and not b.get('force') and (not old or digits(old.get('phone'))!=ph):
+            for j,x in kind('client'):
+                if j!=i and not x.get('purged') and digits(x.get('phone'))==ph:raise Dup(j,x.get('name',''),bool(x.get('arch')))
         put(i,'client',d,'client',by,old);return {'id':i}
+    if a=='archive':
+        i,d=get('client',b.get('id'))
+        if active_of('client',i):raise Bad('Сначала завершите аренду клиента')
+        o=dict(d);archive(i,d,'manual',by,o);return {}
+    if a=='unarchive':
+        i,d=get('client',b.get('id'))
+        if d.get('purged'):raise Bad('Клиент удалён навсегда')
+        o=dict(d);d.pop('arch',None);d.pop('archwhy',None);d['created']=str(t);put(i,'client',d,'unarchive',by,o);return {}
+    if a=='purge':
+        i,d=get('client',b.get('id'))
+        if b.get('confirm')!='УДАЛИТЬ':raise Bad('Нужно подтверждение')
+        if not d.get('arch'):raise Bad('Сначала отправьте клиента в архив')
+        if active_of('client',i):raise Bad('У клиента активная аренда')
+        nd={'name':'Удалённый клиент','phone':'','purged':str(t),'arch':d.get('arch'),'archwhy':d.get('archwhy'),'created':d.get('created'),'_v':d.get('_v',0)+1}
+        save(i,'client',nd);db.execute('delete from bind where client=?',(i,));db.execute('delete from inv where client=?',(i,))
+        db.execute('update log set old=NULL,new=NULL where id=?',(i,))
+        db.execute('insert into log values(?,?,?,?,?)',(now().isoformat(),'purge@'+by,i,None,None));return {}
     if a=='black':
         i,d=get('client',b.get('id'));o=dict(d);d['black']=bool(b.get('on'));d['bnote']=txt(b.get('note'),300);put(i,'client',d,'black',by,o);return {}
     if a=='bike':
@@ -353,17 +392,21 @@ def act(a,b,ro,P,by):
         db.execute('insert into log values(?,?,?,?,?)',(now().isoformat(),'expdel@'+by,i,json.dumps(d,ensure_ascii=False),None));return {}
     if a=='issue':
         ci,c=get('client',b.get('client'));bi,bk=get('bike',b.get('bike'))
+        if c.get('arch'):raise Bad('Клиент в архиве. Сначала верните его из архива.')
         if active_of('client',ci):raise Bad('У клиента уже есть активная аренда')
         if active_of('bike',bi) or bk.get('status')!='free':raise Bad('Велосипед не свободен')
         ty=b.get('type')
         if ty not in LEN:raise Bad('Выберите неделю или месяц')
         iss=day(b.get('date') or t)
+        if iss>t:raise Bad('Дата выдачи не может быть в будущем')
+        if iss<t-dt.timedelta(days=60):raise Bad('Дата выдачи слишком давняя')
         r={'client':ci,'bike':bi,'type':ty,'price':num(b.get('price'),1),'issued':str(iss),'free':bool(b.get('free')),
            'start':str(iss+dt.timedelta(days=1 if b.get('free') else 0)),'status':'active','pays':[],'by':by,'contract':txt(b.get('contract'),40)}
         if b.get('first') is not None:r['once']={'1':num(b.get('first'),1)}
         i=nid();n=int(b.get('payn') or 0)
         if n:
-            q=quote(r,n,iss);addpay(r,n,q['amt'],q['pen'],'cash' if b.get('method')!='transfer' else 'transfer',by)
+            q=quote(r,n,iss);addpay(r,n,q['amt'],q['pen'],'cash' if b.get('method')!='transfer' else 'transfer',by,
+                ts=None if iss==t else dt.datetime.combine(iss,now().time(),MSK).isoformat(timespec='seconds'))
         put(i,'rent',r,'issue',by);return {'id':i}
     if a=='quote':
         i,r=get('rent',b.get('id'));n=int(b.get('n') or 1)
@@ -513,7 +556,7 @@ def act(a,b,ro,P,by):
         old=doc('cfg');c=cfg();o=json.loads(json.dumps(old or {}))
         for k in('week','month'):c[k]=num(b.get(k,c[k]),1)
         c['pen']=num(b.get('pen',c['pen']),0,100);c['tax']=num(b.get('tax',c['tax']),0,100);c['acq']=num(b.get('acq',c['acq']),0,100)
-        c['cdef']=int(num(b.get('cdef',c['cdef']),0,3));c['grace']=int(num(b.get('grace',c['grace']),0,10));c['ddays']=int(num(b.get('ddays',c['ddays']),1,60))
+        c['cdef']=int(num(b.get('cdef',c['cdef']),0,3));c['grace']=int(num(b.get('grace',c['grace']),0,10));c['ddays']=int(num(b.get('ddays',c['ddays']),1,60));c['archdays']=int(num(b.get('archdays',c['archdays']),0,365))
         c['nown']=bool(b.get('nown',c['nown']));c['ncli']=bool(b.get('ncli',c['ncli']))
         if isinstance(b.get('cats'),list):c['cats']=[txt(x,40) for x in b['cats'] if txt(x,40)][:30] or DEF['cats']
         if isinstance(b.get('tochka'),dict):
@@ -735,6 +778,8 @@ class H(BaseHTTPRequestHandler):
                     return s.send(403,{})
                 if ro=='client' and p=='/api/c':
                     r=client_act(x,b);db.commit();return s.send(200,r)
+            except Dup as e:
+                db.rollback();j,nm,ar=e.args;return s.send(409,{'err':f'Клиент с этим номером уже есть: {nm}'+(' (в архиве)' if ar else ''),'dup':j,'arch':ar})
             except Bad as e:
                 db.rollback();return s.send(400,{'err':str(e)})
             except PermissionError:
@@ -771,7 +816,10 @@ def job():
             last=key
             try:
                 if n.hour==3:
-                    with L:snap('app')
+                    with L:
+                        snap('app')
+                        try:autoarch(n.date());db.commit()
+                        except Exception as e:print('autoarch',e);db.rollback()
                 else:morning(n.date())
             except Exception as e:print(e)
         if time.time()-lp>150:
