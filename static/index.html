@@ -154,6 +154,7 @@ label.btn{cursor:pointer}
 .qb{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;min-width:22px;border-radius:50%;border:1.5px solid currentColor;opacity:.6;font-size:13px;font-weight:800;line-height:1;margin-left:8px;vertical-align:middle;cursor:pointer;user-select:none}
 .qb:active{opacity:1}
 .tl .qb,.cb .qb{flex:none!important;width:22px!important;height:22px!important;min-width:22px;padding:0!important;margin:0 6px 0 8px!important;background:none!important;border-radius:50%!important;font-size:13px!important}
+.cn.dcard{border:2px solid var(--ert);background:color-mix(in srgb,var(--ert) 6%,var(--card))}
 </style></head><body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
 <symbol id="i-home" viewBox="0 0 24 24"><path d="M3.5 11 12 3.5 20.5 11M5.5 9.5V20h4.5v-5.5h4V20h4.5V9.5"/></symbol>
@@ -645,26 +646,28 @@ qr:()=>['Оплата по QR','Откроется QR на точную сумм
 defer:()=>{const n=ME.cdef;return ['Отсрочка',`Можно попросить до ${n} ${dayWord(n)} без неустойки. Владелец одобрит или отклонит заявку. Даты следующих оплат при этом не сдвигаются.`]},
 withdebt:()=>['Вместе с долгом','Одним платежом оплатите и аренду, и долг.']};
 async function helpS(k){const [t,x]=HELP[k]();await sheet(`<h3>${esc(t)}</h3><p>${esc(x)}</p><button class="btn blk lg" data-x>Понятно</button>`,(o,d)=>{o.querySelector('[data-x]').onclick=()=>d()},null)}
+let CPO=false;
 function cui(){const R=ME.rent;$('#nav').style.display='none';let h=`<div class=chd><small>Аренда электровелосипеда</small><b>${esc(ME.fio||ME.name||'')}</b></div>`;
 if(!R){h+=ME.debt?`<div class="cn"><div class=mu>Долг по прошлой аренде</div><div class=big style="color:var(--ert)">${m(ME.debt)}</div><div class=mu>Свяжитесь с владельцем для оплаты.</div></div>`:`<div class=center>${ic('bike','l')}<h1>Аренды сейчас нет</h1><p>Когда вам выдадут велосипед, здесь появятся сроки и оплата.</p></div>`;$('#app').innerHTML=h;return}
 const s=R.st,g=ME.grace||0,pen=ME.pen,last=s.late==0&&s.left==0,dlate=s.dlate||0,L=Math.max(s.late,dlate);
-const top=L>0?[(s.pen||s.dpen)?'t-er':'t-wa','alert',s.late>0?`Просрочка ${s.late} ${dayWord(s.late)}`:`Долг просрочен на ${dlate} ${dayWord(dlate)}`]:last?['t-wa','clock','Сегодня последний оплаченный день']:['t-ok','check',`Оплачено ещё ${s.pdays} ${dayWord(s.pdays)}`];
-h+=`<div class="cb ${top[0]}"><span class=gl>${ic(top[1])}</span><span style="flex:1">${top[2]}</span>${QB(L>0?(s.late>0?'late':'debt'):last?'next':'days')}</div>`;
+const top=L>0?[(s.pen||s.dpen||s.dl)?'t-er':'t-wa','alert',s.late>0?`Просрочка ${s.late} ${dayWord(s.late)}`:`Долг просрочен на ${dlate} ${dayWord(dlate)}`]:s.dl>0?['t-er','alert',`Долг ${m(s.dl)} — доплатите до ${dshort(s.ddue)}`]:last?['t-wa','clock','Сегодня последний оплаченный день']:['t-ok','check',`Оплачено ещё ${s.pdays} ${dayWord(s.pdays)}`];
+if(!(s.dl>0&&L==0))h+=`<div class="cb ${top[0]}"><span class=gl>${ic(top[1])}</span><span style="flex:1">${top[2]}</span>${QB(L>0?(s.late>0?'late':'debt'):s.dl>0?'debt':last?'next':'days')}</div>`;
 for(const b of R.bills||[])h+=`<div class="cn" style="border:2px solid var(--pine)"><div class=mu>Владелец выставил платёж ${b.kind=='debt'?'в счёт долга':'за аренду'}${QB('bill')}</div><div class=big style="margin-top:4px">${m(b.amt)}</div>${ME.qr?`<button class="btn blk" style="margin-top:12px" onclick="cBill('${b.id}')">${ic('receipt','s')}Оплатить по QR</button>`:`<div class=mu>Оплатите владельцу удобным способом.</div>`}</div>`;
+if(s.dl>0)h+=`<div class="cn dcard"><div class=mu>${dlate>0?`Долг — срок доплаты был ${dshort(s.ddue)}`:`Долг — доплатить до ${dshort(s.ddue)}`}${QB('debt')}</div><div class=big style="margin-top:4px;color:var(--ert)">${m(s.dl)}</div>
+<div class=mu>${s.dpen?`в том числе неустойка ${m(s.dpen)}`:dlate>0&&!s.nopen?`<b>Неустойка начнётся ${dshort(s.dpfrom)}</b> — ${pen}% от долга за каждый день`:'остаток после частичной оплаты'}</div>
+${ME.qr?`<div class=mu style="margin-top:6px;color:var(--ert);font-weight:650">Сначала оплатите долг</div><button class="btn dng blk" style="margin-top:12px" onclick="cDebt()">${ic('receipt','s')}Доплатить по QR</button>`:''}</div>`;
 h+=`<div class=cn>`;
 if(s.late>0){h+=`<div class=mu>К оплате за аренду${QB('late')}</div><div class=big style="color:var(--${s.pen>0?'ert':'wat'});margin-top:4px">${m(s.debt)}</div>`;
  h+=`<div class=mu>${s.pen>0?`в том числе неустойка ${m(s.pen)} — ${pen}% от платежа за каждый день просрочки`:s.nopen||s.defer?'':`<b>Неустойка начнётся ${dshort(s.pfrom)}</b> — ${pen}% от платежа за каждый день. Оплатите до этого дня, чтобы её не было.`}</div>`}
-else{h+=`<div class=mid>Следующая оплата ${dshort(s.next)}${QB('next')}</div><div class=mu>${m(s.nprice)} за ${TYA[s.ntype]}${last?' · сегодня':' · '+rel(s.left)}</div>
-<div class=hint>${ic('clock','s')} ${last?'Оплатите сегодня следующий период, чтобы не было просрочки.':`Следующий период нужно оплатить в последний оплаченный день — ${dshort(s.next)}.`}</div>`}
+else{h+=`<div class=mid>${last?'Оплатите сегодня следующий период':`Следующая оплата ${dshort(s.next)}`}${QB('next')}</div><div class=mu>${m(s.nprice)} за ${TYA[s.ntype]}${last?'':' · '+rel(s.left)}${s.dl>0&&!last?` · оплачено ещё ${s.pdays} ${dayWord(s.pdays)}`:''}</div>
+`}
 if(s.defer)h+=`<div class=hint>${ic('clock','s')} Отсрочка без неустойки до ${dshort(s.defer)}</div>`;
 h+=`</div>`;
-if(s.dl>0)h+=`<div class=cn><div class=mu>${dlate>0?`Долг — срок доплаты был ${dshort(s.ddue)}`:`Долг — доплатить до ${dshort(s.ddue)}`}${QB('debt')}</div><div class=big style="margin-top:4px;color:var(--${dlate>0&&s.dpen?'ert':'wat'})">${m(s.dl)}</div>
-<div class=mu>${s.dpen?`в том числе неустойка ${m(s.dpen)}`:dlate>0&&!s.nopen?`<b>Неустойка начнётся ${dshort(s.dpfrom)}</b> — ${pen}% от долга за каждый день`:'остаток после частичной оплаты'}</div>
-${ME.qr?`<button class="btn sec blk" style="margin-top:12px" onclick="cDebt()">${ic('receipt','s')}Доплатить по QR</button>`:''}</div>`;
 if(!s.nopen)h+=`<div class=sub style="margin:6px 26px 0">При просрочке ${g?`первые ${g} ${dayWord(g)} без неустойки, затем `:''}${pen}% от платежа за каждый день.</div>`;
 h+=`<div class=cp>${ME.qr?`<button class=tl onclick="cPay()"><span class=gl>${ic('receipt')}</span><span style="flex:1">Оплатить аренду по QR</span>${QB('qr')}${ic('right','s')}</button>`:`<div class="note t-n" style="margin:12px 0 0">${ic('receipt','s')}<div>Оплата по QR скоро появится. Пока оплачивайте так, как договорились с владельцем.</div></div>`}
 ${R.req?`<div class="note t-wa" style="margin:12px 0 0">${ic('clock','s')}<div>Заявка на отсрочку ${R.req.days} ${dayWord(R.req.days)} отправлена. Ждём решения.</div></div>`:ME.cdef>0?`<button class=tl onclick="cReq()"><span class=gl>${ic('clock')}</span><span style="flex:1">Попросить отсрочку</span>${QB('defer')}${ic('right','s')}</button>`:''}</div>
-<h2 class=sec>Платежи</h2>${R.pays.length?`<div class=grp>${R.pays.slice().reverse().map(p=>`<div class="row nl" style="cursor:default;min-height:56px"><span class=tx><b>${m(p.amt)}</b><span>${fmt(p.ts.slice(0,10))} · ${MT[p.method]||p.method}${p.kind=='part'?' · частично':p.kind=='debt'?' · в счёт долга':''}${p.pen?' · неустойка '+m(p.pen):''}</span></span></div>`).join('')}</div>`:`<div class=grp>${empty('Платежей пока нет')}</div>`}
+<div class=cp><button class=tl onclick="CPO=!CPO;cui()"><span class=gl>${ic('clock')}</span><span style="flex:1">Платежи${R.pays.length?` · ${R.pays.length}`:''}</span><span style="flex:none!important;transform:rotate(${CPO?90:0}deg);transition:transform .2s;display:flex;color:var(--mu)">${ic('right','s')}</span></button></div>
+${!CPO?'':R.pays.length?`<div class=grp style="margin-top:10px">${R.pays.slice().reverse().map(p=>`<div class="row nl" style="cursor:default;min-height:56px"><span class=tx><b>${m(p.amt)}</b><span>${fmt(p.ts.slice(0,10))} · ${MT[p.method]||p.method}${p.kind=='part'?' · частично':p.kind=='debt'?' · в счёт долга':''}${p.pen?' · неустойка '+m(p.pen):''}</span></span></div>`).join('')}</div>`:`<div class=grp>${empty('Платежей пока нет')}</div>`}
 ${ME.debt?`<div class="note t-er">${ic('alert','s')}<div>Долг по прошлой аренде: <b>${m(ME.debt)}</b></div></div>`:''}`;
 $('#app').innerHTML=h}
 async function cAfter(qid,title){await showQR(qid,title,1);ME=await api('/api/me');cui()}
