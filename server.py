@@ -16,7 +16,7 @@ HD={'X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','Strict-T
 KINDS=('cfg','admin','client','bike','rent','exp','qr','unk','req','bill')
 PERMS=('pay','partial','bill','defer','pen','rents','seize','clients','bikes','exp','reports')
 LEN={'w':7,'m':30}
-DEF={'week':3500,'month':11000,'pen':5,'grace':2,'ddays':3,'archdays':30,'tax':7,'acq':0,'cdef':3,'nown':False,'ncli':False,
+DEF={'week':3500,'month':11000,'pen':5,'grace':2,'ddays':3,'archdays':30,'cphone':'','ctg':'','tax':7,'acq':0,'cdef':3,'nown':False,'ncli':False,
 'cats':['Ремонт','Запчасти','Обслуживание','Реклама','Зарплата','Аренда помещения','Прочее']}
 ID=re.compile(r'[a-z0-9]{1,16}')
 D=dt.date.fromisoformat
@@ -177,7 +177,7 @@ def active_of(field,val):
     for i,r in kind('rent'):
         if r.get('status')=='active' and r.get(field)==val:return i,r
 # ---------- Точка (СБП) ----------
-# Подключение: в Настройках владелец вписывает JWT-токен, ID торговой точки (merchantId) и ID счёта (accountId).
+# Подключение: в Настройках вписываются JWT-токен, ID торговой точки (merchantId) и ID счёта (accountId).
 # Запросы сделаны по открытому API Точки (раздел СБП); при подключении сверяем с актуальной документацией.
 def tq():
     t=cfg().get('tochka') or {}
@@ -266,7 +266,7 @@ def role(u):
     b=db.execute('select client from bind where tg=?',(u,)).fetchone()
     return ('client',b[0]) if b else ('new',None)
 def snapshot(ro,P):
-    """Все данные для владельца или администратора; аренды и велосипеды с готовыми расчётами."""
+    """Все данные для главного аккаунта или администратора; аренды и велосипеды с готовыми расчётами."""
     fin=ro=='owner' or 'reports' in P;out={k:{} for k in KINDS if k!='cfg'};t=today()
     busy={r['bike']:i for i,r in kind('rent') if r.get('status')=='active'}
     for i,k,d in db.execute('select id,kind,data from docs'):
@@ -297,7 +297,7 @@ def mine(cid):
            'pays':[{k:p.get(k) for k in('ts','n','amt','pen','method','kind')} for p in d.get('pays') or []][-30:],'req':req,'qr':qr,
            'defers':[x for x in d.get('defer') or []][-5:]}
     debt=sum(d.get('debt',0) for _,d in kind('rent') if d.get('client')==cid and d.get('status')!='active')
-    return {'role':'client','name':c.get('name',''),'rent':r,'debt':debt,'cdef':cf['cdef'],'pen':cf['pen'],'grace':cf['grace'],'qr':bool(tq()),'fio':c.get('name','')}
+    return {'role':'client','name':c.get('name',''),'rent':r,'debt':debt,'cdef':cf['cdef'],'pen':cf['pen'],'grace':cf['grace'],'qr':bool(tq()),'fio':c.get('name',''),'cphone':cf['cphone'],'ctg':cf['ctg']}
 # ---------- действия ----------
 NEED={'quote':'pay','issue':'rents','return':'rents','price':'rents','contract':'rents','pay':'pay','paydebt':'pay','qr':'pay','qrcancel':'pay','unk':'pay',
 'defer':'defer','undefer':'defer','nopen':'pen','waive':'pen','paypart':'partial','paydl':'pay','bill':'bill','billvoid':'bill','billpaid':'pay','req':'defer','seize':'seize','client':'clients','black':'clients','archive':'clients','unarchive':'clients','bike':'bikes','bikestat':'bikes','exp':'exp','expdel':'exp'}
@@ -329,7 +329,7 @@ def void_bills(rid,by):
     for j,x in kind('bill'):
         if x.get('rent')==rid and x.get('status')=='open':ox=dict(x);x['status']='void';put(j,'bill',x,'bill-void',by,ox)
 def act(a,b,ro,P,by):
-    """Выполняет действие владельца или администратора. Возвращает ответ (dict). Вызывать под замком."""
+    """Выполняет действие главного аккаунта или администратора. Возвращает ответ (dict). Вызывать под замком."""
     if a in OWNERONLY and ro!='owner':raise PermissionError
     if a in NEED and ro=='admin' and NEED[a] not in P:raise PermissionError
     if a not in NEED and a not in OWNERONLY:raise Bad('Неизвестное действие')
@@ -557,6 +557,7 @@ def act(a,b,ro,P,by):
         for k in('week','month'):c[k]=num(b.get(k,c[k]),1)
         c['pen']=num(b.get('pen',c['pen']),0,100);c['tax']=num(b.get('tax',c['tax']),0,100);c['acq']=num(b.get('acq',c['acq']),0,100)
         c['cdef']=int(num(b.get('cdef',c['cdef']),0,3));c['grace']=int(num(b.get('grace',c['grace']),0,10));c['ddays']=int(num(b.get('ddays',c['ddays']),1,60));c['archdays']=int(num(b.get('archdays',c['archdays']),0,365))
+        c['cphone']=txt(b.get('cphone',c['cphone']),30);c['ctg']=txt(b.get('ctg',c['ctg']),40).lstrip('@').replace('https://t.me/','')
         c['nown']=bool(b.get('nown',c['nown']));c['ncli']=bool(b.get('ncli',c['ncli']))
         if isinstance(b.get('cats'),list):c['cats']=[txt(x,40) for x in b['cats'] if txt(x,40)][:30] or DEF['cats']
         if isinstance(b.get('tochka'),dict):
@@ -624,7 +625,7 @@ def dump():
             ds.append({'id':i,'kind':k,'data':d})
         return json.dumps({'v':1,'app':'rent','ts':now().isoformat(),'docs':ds,'bind':[[a,c] for a,c in db.execute('select tg,client from bind')],
             'log':[list(r) for r in db.execute('select ts,act,id,old,new from log')]},ensure_ascii=False).encode()
-DL={};TTL=int(os.environ.get('DL_TTL','120'));BS=DATA+'/last_download.json'
+IMG={};DL={};TTL=int(os.environ.get('DL_TTL','120'));BS=DATA+'/last_download.json'
 def bget():
     try:return json.load(open(BS))
     except Exception:return None
@@ -696,7 +697,7 @@ class H(BaseHTTPRequestHandler):
                     c=doc(x);un=UN.get(u,'')
                     if c and c.get('tgu','')!=un:c['tgu']=un;save(x,'client',c);db.commit()
                     r=mine(x)
-                else:r={'role':ro}
+                else:cf=cfg();r={'role':ro,'cphone':cf['cphone'],'ctg':cf['ctg']}
             return s.send(200,r)
         if p.startswith('/api/qr/'):
             u=s.user()
@@ -707,6 +708,12 @@ class H(BaseHTTPRequestHandler):
                 if ro=='client' and (doc(q['rent']) or {}).get('client')!=x:return s.send(403,{})
                 if ro not in('owner','admin','client'):return s.send(403,{})
                 return s.send(200,{k:q.get(k) for k in('amt','n','pen','payload','img','status','date')})
+        if p.startswith('/img/'):
+            t=time.time()
+            for a in [a for a,(e,_) in IMG.items() if e<t]:IMG.pop(a,None)
+            x=IMG.get(p[5:])
+            if not x:return s.send(404,b'')
+            return s.send(200,x[1],'image/png',{'Content-Disposition':'attachment; filename="qr-oplata.png"','Cache-Control':'no-store'})
         if p.startswith('/dl/'):
             ip=('dl',s.ip());t=time.time();FAIL[ip]=[x for x in FAIL.get(ip,[]) if x>t-600]
             for a in [a for a,e in DL.items() if e<t]:DL.pop(a,None)
@@ -731,6 +738,16 @@ class H(BaseHTTPRequestHandler):
         except Exception:return s.send(400,{})
         if not isinstance(b,dict):return s.send(400,{})
         t=time.time()
+        if p=='/api/qrimg':
+            # картинка QR, нарисованная в приложении: храним 10 минут, чтобы Telegram мог её скачать
+            import base64
+            with L:ro_,_=role(u)
+            if ro_ not in('owner','admin','client'):return s.send(403,{})
+            try:png=base64.b64decode(str(b.get('png','')).split(',')[-1],validate=True)
+            except Exception:return s.send(400,{})
+            if not png.startswith(b'\x89PNG') or len(png)>400000:return s.send(400,{})
+            if len(IMG)>200:IMG.clear()
+            k=secrets.token_urlsafe(16);IMG[k]=(t+600,png);return s.send(200,{'url':'/img/'+k})
         if u==OWNER and p=='/api/dl':
             k=secrets.token_urlsafe(16);DL[k]=t+TTL;return s.send(200,{'url':'/dl/'+k})
         if u==OWNER and p=='/api/restore':
@@ -740,7 +757,7 @@ class H(BaseHTTPRequestHandler):
             try:
                 if ro in('owner','admin') and p=='/api/act':
                     P=set(x[1].get('perms',[])) if ro=='admin' else set(PERMS)
-                    by='Владелец' if ro=='owner' else str(x[1].get('name',''))[:40]
+                    by='Вы' if ro=='owner' else str(x[1].get('name',''))[:40]
                     r=act(str(b.get('a','')),b,ro,P,by);db.commit();return s.send(200,r)
                 if ro=='owner' and p=='/api/mockpay' and MOCK:
                     i,q=get('qr',b.get('qr'));on_paid(i,q);db.commit();return s.send(200,{})
@@ -789,7 +806,7 @@ class H(BaseHTTPRequestHandler):
         return s.send(403,{})
 # ---------- расписание ----------
 def morning(t):
-    """10:00: сводка владельцу и напоминания клиентам (накануне и в день оплаты). Только если включено в Настройках."""
+    """10:00: сводка вам и напоминания клиентам (накануне и в день оплаты). Только если включено в Настройках."""
     out=[]
     with L:
         cf=cfg()
