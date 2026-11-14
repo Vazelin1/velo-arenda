@@ -10,13 +10,13 @@ TQB=os.environ.get('TOCHKA_BASE','https://enter.tochka.com/uapi');MOCK=os.enviro
 db=sqlite3.connect(DATA+'/app.db',check_same_thread=False)
 db.executescript("create table if not exists docs(id text primary key,kind text,data text);create table if not exists log(ts text,act text,id text,old text,new text);"
 "create table if not exists inv(tok text primary key,client text,exp real);create table if not exists bind(tg integer primary key,client text);create table if not exists ntf(k text primary key)")
-FAIL={};TRY={};BOT=[os.environ.get('BOT_USERNAME','').lstrip('@') or None]
+FAIL={};TRY={};UN={};BOT=[os.environ.get('BOT_USERNAME','').lstrip('@') or None]
 HD={'X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','Strict-Transport-Security':'max-age=31536000',
 'Content-Security-Policy':"default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'self' https://*.telegram.org"}
-KINDS=('cfg','admin','client','bike','rent','exp','qr','unk','req')
-PERMS=('pay','defer','rents','seize','clients','bikes','exp','reports')
+KINDS=('cfg','admin','client','bike','rent','exp','qr','unk','req','bill')
+PERMS=('pay','partial','bill','defer','pen','rents','seize','clients','bikes','exp','reports')
 LEN={'w':7,'m':30}
-DEF={'week':3500,'month':11000,'pen':2,'tax':7,'acq':0,'cdef':3,'nown':False,'ncli':False,
+DEF={'week':3500,'month':11000,'pen':5,'grace':2,'ddays':3,'tax':7,'acq':0,'cdef':3,'nown':False,'ncli':False,
 'cats':['Ремонт','Запчасти','Обслуживание','Реклама','Зарплата','Аренда помещения','Прочее']}
 ID=re.compile(r'[a-z0-9]{1,16}')
 D=dt.date.fromisoformat
@@ -54,7 +54,8 @@ def who(init):
         q=dict(urllib.parse.parse_qsl(init));h=q.pop('hash')
         s='\n'.join(f'{k}={q[k]}' for k in sorted(q))
         key=hmac.new(b'WebAppData',TOK.encode(),hashlib.sha256).digest()
-        if hmac.compare_digest(hmac.new(key,s.encode(),hashlib.sha256).hexdigest(),h) and time.time()-int(q['auth_date'])<86400:return json.loads(q['user'])['id']
+        if hmac.compare_digest(hmac.new(key,s.encode(),hashlib.sha256).hexdigest(),h) and time.time()-int(q['auth_date'])<86400:
+            u=json.loads(q['user']);UN[u['id']]=str(u.get('username') or '')[:40];return u['id']
     except Exception:pass
 def tg(method,data):
     return json.load(urllib.request.urlopen(urllib.request.Request(f'{TGB}/bot{TOK}/{method}',json.dumps(data).encode(),{'Content-Type':'application/json'}),timeout=20))
@@ -87,30 +88,83 @@ def pstart(r,k):
     return s
 def paidn(r):return r.get('base',0)+sum(p.get('n',0) for p in r.get('pays') or [])
 def isfree(r,d):return any(D(x['from'])<=d<=D(x['until']) for x in r.get('defer') or [])
+def due_of(r,k,s):
+    """День оплаты периода k, который начинается s: последний оплаченный день перед ним.
+    Первый период оплачивается в день выдачи (не раньше)."""
+    d=s-dt.timedelta(days=1)
+    return max(d,D(r.get('issued') or r['start'])) if k==1 else d
 def pen(r,due,price,on):
-    """Неустойка за период с днём оплаты due на дату on: ставка% от цены периода за каждый день просрочки, кроме дней отсрочки."""
-    n=0;d=due+dt.timedelta(days=1)
+    """Неустойка за период с днём оплаты due на дату on: ставка% от цены периода за каждый день просрочки,
+    начиная с (льгота+1)-го дня. Не считаются дни отсрочки, списанные дни и аренды с отключённой неустойкой."""
+    if r.get('nopen'):return 0,0
+    c=cfg();g=int(c.get('grace',2));w=D(r['waive']) if r.get('waive') else None
+    n=0;d=due+dt.timedelta(days=g+1)
     while d<=on:
-        if not isfree(r,d):n+=1
+        if not isfree(r,d) and not(w and d<=w):n+=1
         d+=dt.timedelta(days=1)
-    return round(price*cfg()['pen']/100*n),n
+    return round(price*c['pen']/100*n),n
 def owed(r,on,cnt=None):
-    """Неоплаченные периоды, начиная с первого. cnt=None: все наступившие (минимум один, следующий); иначе ровно cnt."""
+    """Неоплаченные периоды, начиная с первого. cnt=None: все, чей день оплаты наступил (минимум один); иначе ровно cnt."""
     k=paidn(r)+1;s=pstart(r,k);out=[]
-    while (len(out)<cnt) if cnt else (s<=on or not out):
-        t,p=plan(r,k);pe,dd=pen(r,s,p,on)
-        out.append({'k':k,'start':str(s),'type':t,'price':p,'pen':pe,'days':dd,'due':s<=on})
+    while len(out)<400:
+        t,p=plan(r,k);du=due_of(r,k,s)
+        if (len(out)>=cnt) if cnt else (out and du>on):break
+        pe,dd=pen(r,du,p,on)
+        out.append({'k':k,'start':str(s),'type':t,'price':p,'pen':pe,'days':dd,'due':du<=on,'pay':str(du)})
         s+=dt.timedelta(days=LEN[t]);k+=1
-        if len(out)>400:break
     return out
 def rstate(r,on=None):
     on=on or today()
     if r.get('status')!='active':return {'debt':r.get('debt',0)}
-    o=owed(r,on);du=[x for x in o if x['due']];n=o[0];ns=D(n['start'])
+    o=owed(r,on);du=[x for x in o if x['due']];n=o[0];nd=D(n['pay'])
     df=next((x['until'] for x in r.get('defer') or [] if D(x['from'])<=on<=D(x['until'])),None)
-    return {'next':n['start'],'nprice':n['price'],'ntype':n['type'],'late':max(0,(on-ns).days),'left':(ns-on).days,
+    return {'next':n['pay'],'start':n['start'],'nprice':n['price'],'ntype':n['type'],'late':max(0,(on-nd).days),'left':(nd-on).days,
             'pen':sum(x['pen'] for x in du),'debt':sum(x['price']+x['pen'] for x in du),'due_n':len(du),'defer':df,'paid':paidn(r),
-            'until':str(ns-dt.timedelta(days=1))}
+            'until':str(D(n['start'])-dt.timedelta(days=1)),'pdays':max(0,(D(n['start'])-on).days),'pfrom':str(nd+dt.timedelta(days=int(cfg().get('grace',2))+1)),'nopen':bool(r.get('nopen')),
+            **dstate(r,on)}
+# Долг активной аренды (частичная оплата): r['dl'] — список {id,amt,due,pen,pdate}. pen — уже начисленная и зафиксированная неустойка,
+# pdate — день последней фиксации (дальше неустойка считается с pdate+1).
+def daccr(r,it,on):
+    """Неустойка по долгу, набежавшая после последней фиксации: ставка% от остатка за каждый день после срока и льготных дней."""
+    if r.get('nopen'):return 0
+    c=cfg();g=int(c.get('grace',2));w=D(r['waive']) if r.get('waive') else None
+    d=D(it['due'])+dt.timedelta(days=g+1)
+    if it.get('pdate'):d=max(d,D(it['pdate'])+dt.timedelta(days=1))
+    n=0
+    while d<=on:
+        if not isfree(r,d) and not(w and d<=w):n+=1
+        d+=dt.timedelta(days=1)
+    return round(it['amt']*c['pen']/100*n)
+def dstate(r,on):
+    its=r.get('dl') or []
+    if not its:return {'dl':0,'dpen':0,'dprin':0}
+    pen=sum(it.get('pen',0)+daccr(r,it,on) for it in its);amt=sum(it['amt'] for it in its);due=min(D(it['due']) for it in its)
+    return {'dl':round(amt+pen,2),'dpen':pen,'dprin':round(amt,2),'ddue':str(due),'dlate':max(0,(on-due).days),
+            'dpfrom':str(due+dt.timedelta(days=int(cfg().get('grace',2))+1))}
+def pay_dl(r,amt,on):
+    """Гасит долг суммой amt: сначала фиксирует неустойку, затем гасит неустойку и сам долг (самые ранние первыми). Возвращает остаток."""
+    its=sorted(r.get('dl') or [],key=lambda x:x['due'])
+    for it in its:it['pen']=it.get('pen',0)+daccr(r,it,on);it['pdate']=str(on)
+    for it in its:
+        x=min(amt,it['pen']);it['pen']=round(it['pen']-x,2);amt-=x
+        x=min(amt,it['amt']);it['amt']=round(it['amt']-x,2);amt-=x
+    r['dl']=[it for it in its if it['amt']>0.005 or it['pen']>0.005]
+    return round(amt,2)
+def add_dl(r,amt,due,by):
+    r.setdefault('dl',[]).append({'id':nid(),'amt':round(amt,2),'orig':round(amt,2),'due':str(due),'pen':0,'ts':now().isoformat(timespec='seconds'),'by':by})
+def apply_money(r,kind_,amt,method,by,due=None,qr=None,on=None):
+    """Зачисляет деньги по выставленному платежу. kind_='period': за следующий период (меньше полной суммы — частичная оплата, остаток в долг);
+    'debt': в счёт долга. Возвращает лишнее (если заплатили больше, чем нужно)."""
+    on=on or today()
+    if kind_=='period':
+        q=quote(r,1,on)
+        if amt+0.005<q['amt']:
+            addpay(r,1,amt,0,method,by,qr,kind='part');add_dl(r,q['amt']-amt,due or on+dt.timedelta(days=int(cfg()['ddays'])),by);return 0
+        addpay(r,1,q['amt'],q['pen'],method,by,qr);amt=round(amt-q['amt'],2)
+        if amt<=0.005:return 0
+    left=pay_dl(r,amt,on)
+    if amt-left>0.005:addpay(r,0,round(amt-left,2),0,method,by,qr,kind='debt')
+    return left
 def quote(r,n,on=None):
     o=owed(r,on or today(),n);return {'amt':sum(x['price']+x['pen'] for x in o),'pen':sum(x['pen'] for x in o),'items':o}
 def addpay(r,n,amt,pe,method,by,qr=None,ts=None,kind=None):
@@ -147,30 +201,47 @@ def qr_paid(ids):
     if MOCK or not ids:return set()
     r=tochka('GET','/sbp/v1.0/qr-codes/'+','.join(ids)+'/payment-status')['Data']
     return {x.get('qrcId') for x in r.get('paymentList',[]) if x.get('status')=='Accepted'}
-def new_qr(rid,r,n,by):
-    """QR на n периодов (или на долг закрытой аренды при n=0). Сумма фиксируется на сегодня, QR действует до конца дня."""
-    if n:q=quote(r,n);amt=q['amt'];pe=q['pen']
-    else:amt=r.get('debt',0);pe=0
+def new_qr(rid,r,n,by,debt=False,bill=None):
+    """QR: на выставленный платёж (bill); на n периодов (+ долг, если debt); на долг активной аренды (n=0); на долг закрытой аренды.
+    Сумма фиксируется на сегодня, QR действует до конца дня."""
+    pe=0;dp=0
+    if bill:amt=bill[1]['amt']
+    elif n:
+        q=quote(r,n);amt=q['amt'];pe=q['pen']
+        if debt:dp=dstate(r,today())['dl'];amt+=dp
+    elif r.get('status')=='active':amt=dstate(r,today())['dl'];dp=amt
+    else:amt=r.get('debt',0)
     if amt<=0:raise Bad('Нечего оплачивать')
-    c=doc(r['client']) or {};b=doc(r.get('bike') or '') or {}
-    m=qr_make(amt,f"Аренда {b.get('num','')} {c.get('name','')}".strip())
-    qid=nid();put(qid,'qr',{'rent':rid,'n':n,'amt':amt,'pen':pe,'base':paidn(r),'date':str(today()),'status':'open','tid':m['id'],'payload':m['payload'],'img':m['img'],'ts':now().isoformat(timespec='seconds')},'qr',by)
-    return qid
+    c=doc(r['client']) or {}
+    m=qr_make(amt,('Аренда электровелосипеда'+(f", договор {r['contract']}" if r.get('contract') else '')+f", {c.get('name','')}").strip(', '))
+    d={'rent':rid,'n':n,'amt':amt,'pen':pe,'dpart':dp,'base':paidn(r),'date':str(today()),'status':'open','tid':m['id'],'payload':m['payload'],'img':m['img'],'ts':now().isoformat(timespec='seconds')}
+    if bill:d['bill']=bill[0]
+    qid=nid();put(qid,'qr',d,'qr',by);return qid
 def on_paid(qid,q):
-    """Банк подтвердил оплату QR. Засчитываем, только если ничего не изменилось с момента создания QR, иначе — в «Не распознано»."""
+    """Банк подтвердил оплату QR. Засчитываем автоматически, если это ещё имеет смысл; иначе — в «Не распознано»."""
     if q.get('status')!='open':return
     old=dict(q);q['status']='paid';put(qid,'qr',q,'qr-paid','',old)
-    r=doc(q['rent']);ok=False
-    if r and q['n'] and r.get('status')=='active' and paidn(r)==q['base'] and str(today())==q['date']:
-        o=dict(r);addpay(r,q['n'],q['amt'],q['pen'],'qr','СБП',qid);put(q['rent'],'rent',r,'pay-qr','',o);ok=True
-    elif r and not q['n'] and r.get('status')!='active' and abs(r.get('debt',0)-q['amt'])<1:
-        o=dict(r);addpay(r,0,q['amt'],0,'qr','СБП',qid,kind='debt');r['debt']=0;put(q['rent'],'rent',r,'pay-qr','',o);ok=True
+    r=doc(q['rent']);ok=False;left=0;o=json.loads(json.dumps(r)) if r else None;t=today()
+    act_=r and r.get('status')=='active'
+    if r and q.get('bill'):
+        b=doc(q['bill'])
+        if b and b.get('status')=='open' and act_:
+            left=apply_money(r,b['kind'],q['amt'],'qr','СБП',D(b['due']) if b.get('due') else None,qid)
+            ob=dict(b);b['status']='paid';b['paid']=now().isoformat(timespec='seconds');put(q['bill'],'bill',b,'bill-paid','',ob);ok=True
+    elif act_ and q['n'] and paidn(r)==q['base'] and str(t)==q['date']:
+        if q.get('dpart'):left=pay_dl(r,q['dpart'],t);addpay(r,0,q['dpart']-left,0,'qr','СБП',qid,kind='debt')
+        addpay(r,q['n'],q['amt']-q.get('dpart',0),q['pen'],'qr','СБП',qid);ok=True
+    elif act_ and not q['n'] and r.get('dl'):
+        left=apply_money(r,'debt',q['amt'],'qr','СБП',qr=qid);ok=True
+    elif r and not q['n'] and not act_ and abs(r.get('debt',0)-q['amt'])<1:
+        addpay(r,0,q['amt'],0,'qr','СБП',qid,kind='debt');r['debt']=0;ok=True
+    if ok:put(q['rent'],'rent',r,'pay-qr','',o)
     c=(doc((r or {}).get('client','')) or {}).get('name','')
-    if ok:say(f"Оплата по QR: {c}, {rub(q['amt'])}.")
+    if ok and left<=0.005:say(f"Оплата по QR: {c}, {rub(q['amt'])}.")
     else:
-        put(nid(),'unk',{'ts':now().isoformat(timespec='seconds'),'amt':q['amt'],'qr':qid,'rent':q['rent'],'status':'open',
-            'why':'Оплата пришла после изменений в аренде или не в тот день'},'unk','')
-        say(f"Платёж по QR не распознан: {c}, {rub(q['amt'])}. Разберите в приложении.")
+        put(nid(),'unk',{'ts':now().isoformat(timespec='seconds'),'amt':left if ok else q['amt'],'qr':qid,'rent':q['rent'],'status':'open',
+            'why':'Переплата сверх долга' if ok else 'Оплата пришла после изменений в аренде или не в тот день'},'unk','')
+        say(f"Платёж по QR не распознан: {c}, {rub(left if ok else q['amt'])}. Разберите в приложении.")
 def poll():
     if not tq():return
     with L:
@@ -210,24 +281,25 @@ def snapshot(ro,P):
         out[k][i]=d
     c=cfg();tc=c.pop('tochka',{}) or {}
     c['tochka']={'on':bool(tq()),'merchant':tc.get('merchant',''),'account':tc.get('account',''),'jwt':bool(tc.get('jwt')),'hook':tc.get('hook','')} if ro=='owner' else {'on':bool(tq())}
-    if not fin:c={x:c[x] for x in('week','month','pen','cdef','cats','tochka')}
+    if not fin:c={x:c[x] for x in('week','month','pen','grace','ddays','cdef','cats','tochka')}
     return {'docs':out,'cfg':c,'today':str(t)}
 def mine(cid):
     c=doc(cid) or {};a=active_of('client',cid);cf=cfg()
     r=None
     if a:
-        i,d=a;st=rstate(d);b=doc(d['bike']) or {}
+        i,d=a;st=rstate(d)
         req=next(({'days':x['days'],'ts':x['ts']} for _,x in kind('req') if x.get('rent')==i and x.get('status')=='pending'),None)
         q1=quote(d,1)
         qr=next(({'id':j,'amt':x['amt'],'n':x['n'],'payload':x['payload'],'img':x.get('img')} for j,x in kind('qr') if x.get('rent')==i and x.get('status')=='open' and x['date']==str(today()) and x['base']==paidn(d)),None)
-        r={'id':i,'bike':b.get('name',''),'num':b.get('num',''),'issued':d.get('issued'),'type':d['type'],'st':st,'q1':q1['amt'],
-           'pays':[{k:p.get(k) for k in('ts','n','amt','pen','method')} for p in d.get('pays') or []][-30:],'req':req,'qr':qr,
+        bills=[{'id':j,'amt':x['amt'],'kind':x['kind'],'due':x.get('due'),'ts':x['ts']} for j,x in kind('bill') if x.get('rent')==i and x.get('status')=='open']
+        r={'id':i,'issued':d.get('issued'),'type':d['type'],'st':st,'q1':q1['amt'],'bills':bills,
+           'pays':[{k:p.get(k) for k in('ts','n','amt','pen','method','kind')} for p in d.get('pays') or []][-30:],'req':req,'qr':qr,
            'defers':[x for x in d.get('defer') or []][-5:]}
     debt=sum(d.get('debt',0) for _,d in kind('rent') if d.get('client')==cid and d.get('status')!='active')
-    return {'role':'client','name':c.get('name',''),'rent':r,'debt':debt,'cdef':cf['cdef'],'pen':cf['pen'],'qr':bool(tq())}
+    return {'role':'client','name':c.get('name',''),'rent':r,'debt':debt,'cdef':cf['cdef'],'pen':cf['pen'],'grace':cf['grace'],'qr':bool(tq()),'fio':c.get('name','')}
 # ---------- действия ----------
 NEED={'quote':'pay','issue':'rents','return':'rents','price':'rents','contract':'rents','pay':'pay','paydebt':'pay','qr':'pay','qrcancel':'pay','unk':'pay',
-'defer':'defer','undefer':'defer','req':'defer','seize':'seize','client':'clients','black':'clients','bike':'bikes','bikestat':'bikes','exp':'exp','expdel':'exp'}
+'defer':'defer','undefer':'defer','nopen':'pen','waive':'pen','paypart':'partial','paydl':'pay','bill':'bill','billvoid':'bill','billpaid':'pay','req':'defer','seize':'seize','client':'clients','black':'clients','bike':'bikes','bikestat':'bikes','exp':'exp','expdel':'exp'}
 OWNERONLY={'cfg','admin','admindel','fix','paydel'}
 def need_v(b,d):
     if b.get('v') is not None and b.get('v')!=d.get('_v'):raise Bad('Данные только что изменились. Обновите экран.')
@@ -235,6 +307,9 @@ def get(k,i):
     r=ID.fullmatch(str(i or '')) and row(str(i))
     if not r or r[0]!=k:raise Bad('Запись не найдена')
     return str(i),r[1]
+def void_bills(rid,by):
+    for j,x in kind('bill'):
+        if x.get('rent')==rid and x.get('status')=='open':ox=dict(x);x['status']='void';put(j,'bill',x,'bill-void',by,ox)
 def act(a,b,ro,P,by):
     """Выполняет действие владельца или администратора. Возвращает ответ (dict). Вызывать под замком."""
     if a in OWNERONLY and ro!='owner':raise PermissionError
@@ -294,10 +369,10 @@ def act(a,b,ro,P,by):
         i,r=get('rent',b.get('id'));n=int(b.get('n') or 1)
         if r.get('status')!='active' or not 1<=n<=24:raise Bad('Нечего оплачивать')
         q=quote(r,n);return {'amt':q['amt'],'pen':q['pen'],'from':q['items'][0]['start'],'to':str(D(q['items'][-1]['start'])+dt.timedelta(days=LEN[q['items'][-1]['type']]-1))}
-    if a in('pay','paydebt','qr','qrcancel','return','seize','price','defer','undefer','contract','fix','paydel'):
+    if a in('pay','paydebt','qr','qrcancel','return','seize','price','defer','undefer','contract','fix','paydel','nopen','waive','paypart','paydl','bill','billvoid','billpaid'):
         i,r=get('rent',b.get('id'));need_v(b,r);o=json.loads(json.dumps(r))
         act_=r.get('status')=='active'
-        if a in('pay','qr','return','seize','price','defer','undefer','fix') and not act_ and not(a=='qr' and r.get('debt')):raise Bad('Аренда уже закрыта')
+        if a in('pay','qr','return','seize','price','defer','undefer','fix','nopen','waive','paypart','paydl','bill','billvoid','billpaid') and not act_ and not(a=='qr' and r.get('debt')):raise Bad('Аренда уже закрыта')
         if a=='pay':
             n=int(b.get('n') or 1)
             if not 1<=n<=24:raise Bad('Неверное число периодов')
@@ -308,14 +383,61 @@ def act(a,b,ro,P,by):
             for j,x in kind('qr'):
                 if x.get('rent')==i and x.get('status')=='open':ox=dict(x);x['status']='void';put(j,'qr',x,'qr-void',by,ox)
             return {'amt':q['amt']}
+        if a=='paypart':
+            # частичная оплата следующего периода: период засчитан, остаток — долг со сроком доплаты
+            m=b.get('method')
+            if m not in('cash','transfer'):raise Bad('Выберите способ оплаты')
+            amt=num(b.get('amt'),1);q=quote(r,1)
+            if amt+0.005>=q['amt']:raise Bad('Это полная сумма — примите обычную оплату')
+            du=day(b.get('due') or t+dt.timedelta(days=int(cfg()['ddays'])))
+            if du<t:raise Bad('Срок доплаты уже прошёл')
+            apply_money(r,'period',amt,m,by,du);put(i,'rent',r,'paypart',by,o);return {'debt':round(q['amt']-amt,2)}
+        if a=='paydl':
+            m=b.get('method')
+            if m not in('cash','transfer'):raise Bad('Выберите способ оплаты')
+            amt=num(b.get('amt'),1);tot=dstate(r,t)['dl']
+            if not tot:raise Bad('Долга нет')
+            if amt>tot+0.005:raise Bad(f'Долг всего {rub(tot)}')
+            apply_money(r,'debt',amt,m,by);put(i,'rent',r,'paydl',by,o);return {'left':dstate(r,t)['dl']}
+        if a=='bill':
+            k=b.get('kind');amt=num(b.get('amt'),1)
+            if k=='period':
+                q=quote(r,1)
+                if amt>q['amt']+0.005:raise Bad(f"Платёж за период {rub(q['amt'])}, больше выставить нельзя")
+                if amt+0.005<q['amt'] and ro=='admin' and 'partial' not in P:raise PermissionError
+                du=day(b.get('due') or t+dt.timedelta(days=int(cfg()['ddays'])))
+                if du<t:raise Bad('Срок доплаты уже прошёл')
+            elif k=='debt':
+                tot=dstate(r,t)['dl']
+                if not tot:raise Bad('Долга нет')
+                if amt>tot+0.005:raise Bad(f'Долг всего {rub(tot)}')
+                du=None
+            else:raise Bad('Выберите, за что платёж')
+            for j,x in kind('bill'):
+                if x.get('rent')==i and x.get('status')=='open':raise Bad('У клиента уже есть неоплаченный выставленный платёж. Отмените его или отметьте оплату.')
+            bi=nid();put(bi,'bill',{'rent':i,'client':r['client'],'kind':k,'amt':amt,'due':str(du) if du else None,'status':'open','ts':now().isoformat(timespec='seconds'),'by':by},'bill',by)
+            tell(r['client'],f'Вам выставлен платёж {rub(amt)}. Оплатить можно в приложении.');return {'id':bi}
+        if a in('billvoid','billpaid'):
+            j,x=get('bill',b.get('bill'))
+            if x.get('rent')!=i or x.get('status')!='open':raise Bad('Платёж уже закрыт')
+            ox=dict(x)
+            if a=='billvoid':x['status']='void';put(j,'bill',x,'bill-void',by,ox);return {}
+            m=b.get('method')
+            if m not in('cash','transfer'):raise Bad('Выберите способ оплаты')
+            left=apply_money(r,x['kind'],x['amt'],m,by,D(x['due']) if x.get('due') else None)
+            x['status']='paid';x['paid']=now().isoformat(timespec='seconds');put(j,'bill',x,'bill-paid',by,ox);put(i,'rent',r,'billpaid',by,o);return {'left':left}
         if a=='paydebt':
             if act_ or not r.get('debt'):raise Bad('Долга нет')
             m=b.get('method') if b.get('method') in('cash','transfer','qr') else 'cash'
             addpay(r,0,r['debt'],0,m,by,kind='debt');r['debt']=0;put(i,'rent',r,'paydebt',by,o);return {}
         if a=='qr':
-            n=0 if not act_ else int(b.get('n') or 1)
-            if act_ and not 1<=n<=12:raise Bad('Неверное число периодов')
-            return {'qr':new_qr(i,r,n,by)}
+            if b.get('bill'):
+                j,x=get('bill',b['bill'])
+                if x.get('rent')!=i or x.get('status')!='open':raise Bad('Платёж уже закрыт')
+                return {'qr':new_qr(i,r,0,by,bill=(j,x))}
+            n=0 if (not act_ or b.get('debtonly')) else int(b.get('n') or 1)
+            if act_ and not b.get('debtonly') and not 1<=n<=12:raise Bad('Неверное число периодов')
+            return {'qr':new_qr(i,r,n,by,debt=bool(b.get('debt')))}
         if a=='qrcancel':
             j,x=get('qr',b.get('qr'))
             if x.get('status')=='open':ox=dict(x);x['status']='void';put(j,'qr',x,'qr-void',by,ox)
@@ -339,6 +461,13 @@ def act(a,b,ro,P,by):
             if u<t:raise Bad('Дата уже прошла')
             r.setdefault('defer',[]).append({'from':str(t),'until':str(u),'by':by,'ts':now().isoformat(timespec='seconds')})
             put(i,'rent',r,'defer',by,o);tell(r['client'],f'Вам дана отсрочка без неустойки до {dm(u)}.');return {}
+        if a=='nopen':
+            r['nopen']=bool(b.get('on'));put(i,'rent',r,'nopen',by,o);return {}
+        if a=='waive':
+            st=rstate(r,t);amt=st['pen']+st['dpen'];r['waive']=str(t);r.setdefault('waived',[]).append({'date':str(t),'amt':amt,'by':by})
+            for it in r.get('dl') or []:it['pen']=0;it['pdate']=str(t)
+            r['dl']=[it for it in r.get('dl') or [] if it['amt']>0.005]
+            put(i,'rent',r,'waive',by,o);return {'amt':amt}
         if a=='undefer':
             r['defer']=[x for x in r.get('defer') or [] if D(x['until'])<t];put(i,'rent',r,'undefer',by,o);return {}
         if a=='contract':
@@ -348,12 +477,14 @@ def act(a,b,ro,P,by):
             put(i,'rent',r,'fix',by,o);return {}
         st=rstate(r,t)
         if a=='return':
-            debt=num(b.get('debt') if b.get('debt') is not None else st['debt']);ref=num(b.get('refund') or 0)
-            r.update(status='closed',closed=str(t),debt=debt,refund={'amt':ref,'date':str(t)} if ref else None,debt0=st['debt'])
+            debt=num(b.get('debt') if b.get('debt') is not None else st['debt']+st['dl']);ref=num(b.get('refund') or 0)
+            r.update(status='closed',closed=str(t),debt=debt,refund={'amt':ref,'date':str(t)} if ref else None,debt0=st['debt']+st['dl'],dl=[])
+            void_bills(i,by)
             put(i,'rent',r,'return',by,o);return {}
         if a=='seize':
             if b.get('confirm')!='ИЗЪЯТЬ':raise Bad('Нужно подтверждение')
-            r.update(status='seized',closed=str(t),debt=0,writeoff=st['debt'])
+            r.update(status='seized',closed=str(t),debt=0,writeoff=st['debt']+st['dl'],dl=[])
+            void_bills(i,by)
             put(i,'rent',r,'seize',by,o);return {}
     if a=='unk':
         i,u=get('unk',b.get('id'));o=dict(u)
@@ -382,7 +513,7 @@ def act(a,b,ro,P,by):
         old=doc('cfg');c=cfg();o=json.loads(json.dumps(old or {}))
         for k in('week','month'):c[k]=num(b.get(k,c[k]),1)
         c['pen']=num(b.get('pen',c['pen']),0,100);c['tax']=num(b.get('tax',c['tax']),0,100);c['acq']=num(b.get('acq',c['acq']),0,100)
-        c['cdef']=int(num(b.get('cdef',c['cdef']),0,3))
+        c['cdef']=int(num(b.get('cdef',c['cdef']),0,3));c['grace']=int(num(b.get('grace',c['grace']),0,10));c['ddays']=int(num(b.get('ddays',c['ddays']),1,60))
         c['nown']=bool(b.get('nown',c['nown']));c['ncli']=bool(b.get('ncli',c['ncli']))
         if isinstance(b.get('cats'),list):c['cats']=[txt(x,40) for x in b['cats'] if txt(x,40)][:30] or DEF['cats']
         if isinstance(b.get('tochka'),dict):
@@ -403,7 +534,7 @@ def act(a,b,ro,P,by):
         nm=txt(b.get('name'),60);ph=txt(b.get('phone'),30)
         if not nm or not digits(ph):raise Bad('Укажите имя и телефон')
         pl=b.get('perms') if isinstance(b.get('perms'),list) else []
-        d={'name':nm,'phone':ph,'perms':[q for q in PERMS if q in pl],'tg':(old or {}).get('tg'),'disabled':bool(b.get('disabled')),'created':(old or {}).get('created',str(t))}
+        d={'name':nm,'phone':ph,'perms':[q for q in PERMS if q in pl],'tg':(old or {}).get('tg'),'tgu':(old or {}).get('tgu',''),'disabled':bool(b.get('disabled')),'created':(old or {}).get('created',str(t)),'m2':1}
         put(i,'admin',d,'admin',by,old);return {'id':i}
     if a=='admindel':
         i,d=get('admin',b.get('id'));db.execute('delete from docs where id=?',(i,))
@@ -416,13 +547,23 @@ def client_act(cid,b):
     if b.get('a')=='quote':
         n=int(b.get('n') or 1)
         if not 1<=n<=6:raise Bad('Неверное число периодов')
-        q=quote(r,n);return {'amt':q['amt'],'pen':q['pen'],'to':str(D(q['items'][-1]['start'])+dt.timedelta(days=LEN[q['items'][-1]['type']]-1))}
+        q=quote(r,n);dp=dstate(r,today())['dl'] if b.get('debt') else 0
+        return {'amt':q['amt']+dp,'pen':q['pen'],'dl':dp,'to':str(D(q['items'][-1]['start'])+dt.timedelta(days=LEN[q['items'][-1]['type']]-1))}
+    if b.get('a')=='qr' and b.get('bill'):
+        j,x=get('bill',b['bill'])
+        if x.get('rent')!=i or x.get('status')!='open':raise Bad('Платёж уже закрыт')
+        for k,y in kind('qr'):
+            if y.get('bill')==j and y.get('status')=='open' and y['date']==str(today()):return {'qr':k}
+        return {'qr':new_qr(i,r,0,'клиент',bill=(j,x))}
+    if b.get('a')=='qr' and b.get('debtonly'):
+        if not r.get('dl'):raise Bad('Долга нет')
+        return {'qr':new_qr(i,r,0,'клиент')}
     if b.get('a')=='qr':
         n=int(b.get('n') or 1)
         if not 1<=n<=6:raise Bad('Неверное число периодов')
         for j,x in kind('qr'):
-            if x.get('rent')==i and x.get('status')=='open' and x['date']==str(today()) and x['base']==paidn(r) and x['n']==n:return {'qr':j}
-        return {'qr':new_qr(i,r,n,'клиент')}
+            if x.get('rent')==i and x.get('status')=='open' and x['date']==str(today()) and x['base']==paidn(r) and x['n']==n and not x.get('bill') and bool(x.get('dpart'))==bool(b.get('debt')):return {'qr':j}
+        return {'qr':new_qr(i,r,n,'клиент',debt=bool(b.get('debt')))}
     if b.get('a')=='req':
         n=int(b.get('days') or 0);mx=cfg()['cdef']
         if not 1<=n<=mx:raise Bad(f'Отсрочку можно попросить на 1–{mx} дн.')
@@ -473,6 +614,7 @@ def restore(b):
             db.executemany('insert into docs values(?,?,?)',rows);db.executemany('insert or replace into bind values(?,?)',bi)
             if empty:db.executemany('insert into log values(?,?,?,?,?)',lg)
             db.execute('insert into log values(?,?,?,?,?)',(now().isoformat(),'restore','',None,json.dumps({'docs':len(rows),'from':b.get('ts')})));db.commit()
+            migrate()
         except Exception as e:
             db.rollback();print('restore',e);return 500,'Не удалось загрузить, данные не изменены.'
     return 200,len(rows)
@@ -507,7 +649,10 @@ class H(BaseHTTPRequestHandler):
                     r=[list(q) for q in db.execute('select ts,act,id,old,new from log order by rowid desc limit 300')]
                 elif ro=='owner':r={'role':'owner','backup':bget(),'empty':not db.execute("select 1 from docs where kind in('rent','bike','client') limit 1").fetchone()}
                 elif ro=='admin':r={'role':'admin','name':x[1].get('name',''),'perms':[q for q in x[1].get('perms',[]) if q in PERMS]}
-                elif ro=='client':r=mine(x)
+                elif ro=='client':
+                    c=doc(x);un=UN.get(u,'')
+                    if c and c.get('tgu','')!=un:c['tgu']=un;save(x,'client',c);db.commit()
+                    r=mine(x)
                 else:r={'role':ro}
             return s.send(200,r)
         if p.startswith('/api/qr/'):
@@ -563,7 +708,8 @@ class H(BaseHTTPRequestHandler):
                     if not adm and ((ro=='admin' and 'clients' not in x[1].get('perms',[])) or not a or a[0]!='client'):return s.send(403,{})
                     if p=='/api/invite':
                         if not botname():return s.send(500,{'err':'Бот недоступен'})
-                        k=secrets.token_urlsafe(9);db.execute('insert into inv values(?,?,?)',(k,c,t+7*86400));db.commit()
+                        q=bool(b.get('qr'));k=('qq'+secrets.token_hex(12)) if q else secrets.token_urlsafe(9)
+                        db.execute('insert into inv values(?,?,?)',(k,c,t+(600 if q else 7*86400)));db.commit()
                         return s.send(200,{'tok':k,'bot':BOT[0]})
                     if adm:a[1]['tg']=None;save(c[4:],'admin',a[1])
                     else:db.execute('delete from bind where client=?',(c,))
@@ -572,15 +718,17 @@ class H(BaseHTTPRequestHandler):
                     TRY[u]=[q for q in TRY.get(u,[]) if q>t-3600]
                     if len(TRY[u])>=5:return s.send(429,{})
                     TRY[u].append(t)
-                    i=db.execute('select client from inv where tok=? and exp>?',(str(b.get('tok')),t)).fetchone();ph=digits(b.get('phone'));tgt=i and i[0]
+                    tk=str(b.get('tok'));i=db.execute('select client from inv where tok=? and exp>?',(tk,t)).fetchone();tgt=i and i[0]
+                    isq=tk.startswith('qq') and len(tk)==26;ph=digits(b.get('phone'))
                     if tgt and tgt.startswith('adm:'):
                         a=row(tgt[4:]);c=a and a[0]=='admin' and not a[1].get('disabled') and a[1]
-                        if c and ph and digits(c.get('phone'))==ph:
-                            c['tg']=u;save(tgt[4:],'admin',c);db.execute('delete from inv where tok=?',(str(b.get('tok')),));db.commit()
+                        if c and (isq or (ph and digits(c.get('phone'))==ph)):
+                            c['tg']=u;c['tgu']=UN.get(u,'');save(tgt[4:],'admin',c);db.execute('delete from inv where tok=?',(str(b.get('tok')),));db.commit()
                             say(f"Администратор {c.get('name')} вошёл в приложение аренды.");return s.send(200,{})
                     else:
                         c=tgt and doc(tgt)
-                        if c and ph and digits(c.get('phone'))==ph:
+                        if c and (isq or (ph and digits(c.get('phone'))==ph)):
+                            c['tgu']=UN.get(u,'');save(tgt,'client',c)
                             db.execute('insert or replace into bind values(?,?)',(u,tgt));db.execute('delete from inv where tok=?',(str(b.get('tok')),));db.commit()
                             say(f"Клиент {c.get('name')} вошёл в приложение аренды.");return s.send(200,{})
                     if len(TRY[u])==3:say(f'Неудачные попытки входа (Telegram ID {u}).')
@@ -631,6 +779,25 @@ def job():
             try:poll()
             except Exception as e:print('poll',e)
         time.sleep(20)
+def migrate():
+    """Перенесённые аренды: день оплаты = дата окончания в старом сервисе (новый период начинается на день позже).
+    Настройки: неустойка 5% с 3-го дня, если льгота ещё не задана."""
+    with L:
+        for i,r in kind('rent'):
+            if r.get('imported') and not r.get('m1'):
+                o=dict(r);r['m1']=1
+                if r.get('status')=='active':r['shift']=r.get('shift',0)+1
+                put(i,'rent',r,'migrate','',o)
+        for i,a in kind('admin'):
+            if not a.get('m2'):
+                p=a.get('perms') or []
+                if 'pay' in p:p=p+[x for x in('partial','bill') if x not in p]
+                if 'defer' in p and 'pen' not in p:p=p+['pen']
+                a['perms']=[x for x in PERMS if x in p];a['m2']=1;save(i,'admin',a)
+        c=doc('cfg')
+        if c is not None and 'grace' not in c:c['grace']=2;c['pen']=5;save('cfg','cfg',c)
+        db.commit()
+migrate()
 if __name__=='__main__':
     threading.Thread(target=job,daemon=True).start()
     threading.Thread(target=botname,daemon=True).start()
