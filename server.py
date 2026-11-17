@@ -15,8 +15,11 @@ HD={'X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','Strict-T
 'Content-Security-Policy':"default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'self' https://*.telegram.org"}
 KINDS=('cfg','admin','client','bike','rent','exp','qr','unk','req','bill')
 PERMS=('pay','partial','bill','defer','pen','rents','seize','clients','bikes','exp','reports')
-LEN={'w':7,'m':30}
-DEF={'week':3500,'month':11000,'pen':5,'grace':2,'ddays':3,'archdays':30,'cphone':'','ctg':'','tax':7,'acq':0,'cdef':3,'nown':False,'ncli':False,
+BASE_TERMS=('w','m')
+TERM_DAYS={'w':7,'w2':14,'w3':21,'m':30}
+DEFAULT_RATES={'w':3700,'w2':7300,'w3':10800,'m':15000}
+DEF={'week':DEFAULT_RATES['w'],'month':DEFAULT_RATES['m'],'renewal_rates':DEFAULT_RATES,
+'pen':5,'grace':2,'ddays':3,'archdays':30,'cphone':'','ctg':'','tax':7,'acq':0,'receipt':0,'cdef':3,'nown':False,'ncli':False,
 'cats':['Ремонт','Запчасти','Обслуживание','Реклама','Зарплата','Аренда помещения','Прочее']}
 ID=re.compile(r'[a-z0-9]{1,16}')
 D=dt.date.fromisoformat
@@ -33,6 +36,9 @@ def num(x,lo=0,hi=10**8):
     except Exception:raise Bad('Неверное число')
     if not lo<=v<=hi:raise Bad('Число вне допустимого диапазона')
     return round(v,2)
+def rate_prices(values):
+    if not isinstance(values,dict) or set(values)!=set(TERM_DAYS):raise Bad('Укажите все четыре цены')
+    return {term:num(values[term],1) for term in TERM_DAYS}
 def day(x):
     try:return D(str(x))
     except Exception:raise Bad('Неверная дата')
@@ -77,17 +83,43 @@ def botname():
 # ---------- расчёт аренды ----------
 # Аренда: start — начало первого оплачиваемого периода; base — периоды, оплаченные до переноса;
 # plan — смены цены/периода с номера периода k; once — цена на один период; defer — отсрочки {from,until}.
-def plan(r,k):
+def recurring_plan(r,k):
     t,p=r['type'],r['price']
     for c in r.get('plan') or []:
         if c['k']<=k:t=c.get('type') or t;p=c['price']
-    o=(r.get('once') or {}).get(str(k))
-    return t,(p if o is None else o)
+    return t,p
+def plan(r,k):
+    t,p=recurring_plan(r,k)
+    initial=r.get('initial') if k==1 else None
+    if initial:
+        t,p=initial['term'],initial['price']
+    once=(r.get('once') or {}).get(str(k))
+    return t,p if once is None else once
+def set_plan(r,k,period,price,date,by):
+    r['plan']=[c for c in r.get('plan') or [] if c['k']<k]
+    r['plan'].append({'k':k,'type':period,'price':price,'ts':str(date),'by':by})
 def pstart(r,k):
     s=D(r['start'])+dt.timedelta(days=r.get('shift',0))
-    for j in range(1,k):s+=dt.timedelta(days=LEN[plan(r,j)[0]])
+    durations={}
+    j=r.get('base',0)+1
+    for p in r.get('pays') or []:
+        if p.get('term') in TERM_DAYS:durations[j]=TERM_DAYS[p['term']]
+        j+=p.get('n',0)
+    for j in range(1,k):
+        s+=dt.timedelta(days=durations[j] if j in durations else TERM_DAYS[plan(r,j)[0]])
     return s
 def paidn(r):return r.get('base',0)+sum(p.get('n',0) for p in r.get('pays') or [])
+def renewed_after_first_term(r,on):
+    """True/False для аренд с истёкшим первым сроком и доступной историей оплаты."""
+    if r.get('imported') or r.get('base') or not r.get('start'):return None
+    try:
+        periods=[p['n'] for p in r.get('pays') or [] if p.get('n',0)>0]
+        # До выбора срока при выдаче первая оплата могла покрывать несколько базовых периодов.
+        first_periods=1 if r.get('initial') or not periods else periods[0]
+        if first_periods>400 or pstart(r,first_periods+1)>on:return None
+        return sum(periods)>first_periods
+    except (KeyError,TypeError,ValueError,OverflowError):
+        return None
 def isfree(r,d):return any(D(x['from'])<=d<=D(x['until']) for x in r.get('defer') or [])
 def due_of(r,k,s):
     """День оплаты периода k, который начинается s: последний оплаченный день перед ним.
@@ -112,14 +144,21 @@ def owed(r,on,cnt=None):
         if (len(out)>=cnt) if cnt else (out and du>on):break
         pe,dd=pen(r,du,p,on)
         out.append({'k':k,'start':str(s),'type':t,'price':p,'pen':pe,'days':dd,'due':du<=on,'pay':str(du)})
-        s+=dt.timedelta(days=LEN[t]);k+=1
+        s+=dt.timedelta(days=TERM_DAYS[t]);k+=1
     return out
 def rstate(r,on=None):
     on=on or today()
     if r.get('status')!='active':return {'debt':r.get('debt',0)}
-    o=owed(r,on);du=[x for x in o if x['due']];n=o[0];nd=D(n['pay'])
+    waiting=r.get('waiting')
+    if waiting:on=min(on,D(waiting))
+    o=owed(r,on)
+    du=[x for x in o if x['due'] and (not waiting or D(x['start'])<=on)]
+    n=o[0];nd=D(n['pay'])
     df=next((x['until'] for x in r.get('defer') or [] if D(x['from'])<=on<=D(x['until'])),None)
-    return {'next':n['pay'],'start':n['start'],'nprice':n['price'],'ntype':n['type'],'late':max(0,(on-nd).days),'left':(nd-on).days,
+    basetype,baseprice=recurring_plan(r,n['k'])
+    return {'next':n['pay'],'start':n['start'],'nprice':n['price'],'ntype':n['type'],
+            'firstterm':n['type'] if n['k']==1 and r.get('initial') else None,'basetype':basetype,'baseprice':baseprice,
+            'late':max(0,(on-nd).days),'left':(nd-on).days,
             'pen':sum(x['pen'] for x in du),'debt':sum(x['price']+x['pen'] for x in du),'due_n':len(du),'defer':df,'paid':paidn(r),
             'until':str(D(n['start'])-dt.timedelta(days=1)),'pdays':max(0,(D(n['start'])-on).days),'pfrom':str(nd+dt.timedelta(days=int(cfg().get('grace',2))+1)),'nopen':bool(r.get('nopen')),
             **dstate(r,on)}
@@ -168,10 +207,50 @@ def apply_money(r,kind_,amt,method,by,due=None,qr=None,on=None):
     return left
 def quote(r,n,on=None):
     o=owed(r,on or today(),n);return {'amt':sum(x['price']+x['pen'] for x in o),'pen':sum(x['pen'] for x in o),'items':o}
-def addpay(r,n,amt,pe,method,by,qr=None,ts=None,kind=None):
+def term_quote(r,n,term=None,on=None):
+    on=on or today()
+    if term:
+        k=paidn(r)+1
+        initial=r.get('initial') if k==1 else None
+        if not isinstance(term,str) or term not in TERM_DAYS:raise Bad('Неверный срок оплаты')
+        if initial and term!=initial['term']:raise Bad('Сначала оплатите первый срок аренды')
+        if not initial and term not in (r.get('rates') or {}):
+            raise Bad('Цена на этот срок не настроена')
+        start=pstart(r,k)
+        days=TERM_DAYS[term]
+        # Начисленная неустойка относится только к дням, которые закрывает платёж.
+        # График и база неустойки остаются условиями действующей аренды.
+        end=start+dt.timedelta(days=days)
+        pe=0
+        for x in owed(r,on,(days+6)//7):
+            duration=TERM_DAYS[x['type']]
+            covered=min(duration,(end-D(x['start'])).days)
+            if covered<=0:break
+            pe+=round(x['pen']*covered/duration,2)
+        if initial:rent_amt=plan(r,k)[1]
+        else:
+            rent_amt=r['rates'][term]
+            if term==recurring_plan(r,k)[0]:
+                once=(r.get('once') or {}).get(str(k))
+                if once is not None:rent_amt=once
+    else:
+        q=quote(r,n,on)
+        start=D(q['items'][0]['start'])
+        last=q['items'][-1]
+        end=D(last['start'])+dt.timedelta(days=TERM_DAYS[last['type']])
+        days=(end-start).days
+        pe=q['pen']
+        rent_amt=q['amt']-pe
+    return {'amt':round(rent_amt+pe,2),'pen':round(pe,2),'rent_amt':round(rent_amt,2),
+            'weekly':round(rent_amt*7/days,2),'from':str(start),'to':str(end-dt.timedelta(days=1))}
+def check_amount(b,amount):
+    if b.get('expected') is not None and num(b['expected'])!=round(amount,2):
+        raise Bad('Сумма изменилась. Откройте оплату заново.')
+def addpay(r,n,amt,pe,method,by,qr=None,ts=None,kind=None,term=None):
     p={'ts':ts or now().isoformat(timespec='seconds'),'n':n,'amt':amt,'pen':pe,'method':method,'by':by}
     if qr:p['qr']=qr
     if kind:p['kind']=kind
+    if term:p['term']=term
     r.setdefault('pays',[]).append(p)
 def active_of(field,val):
     for i,r in kind('rent'):
@@ -202,39 +281,42 @@ def qr_paid(ids):
     if MOCK or not ids:return set()
     r=tochka('GET','/sbp/v1.0/qr-codes/'+','.join(ids)+'/payment-status')['Data']
     return {x.get('qrcId') for x in r.get('paymentList',[]) if x.get('status')=='Accepted'}
-def new_qr(rid,r,n,by,debt=False,bill=None):
+def new_qr(rid,r,n,by,debt=False,bill=None,term=None,expected=None):
     """QR: на выставленный платёж (bill); на n периодов (+ долг, если debt); на долг активной аренды (n=0); на долг закрытой аренды.
     Сумма фиксируется на сегодня, QR действует до конца дня."""
     pe=0;dp=0
     if bill:amt=bill[1]['amt']
     elif n:
-        q=quote(r,n);amt=q['amt'];pe=q['pen']
+        q=term_quote(r,n,term);amt=q['amt'];pe=q['pen']
         if debt:dp=dstate(r,today())['dl'];amt+=dp
     elif r.get('status')=='active':amt=dstate(r,today())['dl'];dp=amt
     else:amt=r.get('debt',0)
     if amt<=0:raise Bad('Нечего оплачивать')
+    check_amount({'expected':expected},amt)
     c=doc(r['client']) or {}
     m=qr_make(amt,('Аренда электровелосипеда'+(f", договор {r['contract']}" if r.get('contract') else '')+f", {c.get('name','')}").strip(', '))
     d={'rent':rid,'n':n,'amt':amt,'pen':pe,'dpart':dp,'base':paidn(r),'date':str(today()),'status':'open','tid':m['id'],'payload':m['payload'],'img':m['img'],'ts':now().isoformat(timespec='seconds')}
     if bill:d['bill']=bill[0]
+    if term:d.update(term=term,start=q['from'])
     qid=nid();put(qid,'qr',d,'qr',by);return qid
 def on_paid(qid,q):
     """Банк подтвердил оплату QR. Засчитываем автоматически, если это ещё имеет смысл; иначе — в «Не распознано»."""
     if q.get('status')!='open':return
     old=dict(q);q['status']='paid';put(qid,'qr',q,'qr-paid','',old)
     r=doc(q['rent']);ok=False;left=0;o=json.loads(json.dumps(r)) if r else None;t=today()
-    act_=r and r.get('status')=='active'
+    act_=r and r.get('status')=='active' and not r.get('waiting')
     if r and q.get('bill'):
         b=doc(q['bill'])
         if b and b.get('status')=='open' and act_:
             left=apply_money(r,b['kind'],q['amt'],'qr','СБП',D(b['due']) if b.get('due') else None,qid)
             ob=dict(b);b['status']='paid';b['paid']=now().isoformat(timespec='seconds');put(q['bill'],'bill',b,'bill-paid','',ob);ok=True
-    elif act_ and q['n'] and paidn(r)==q['base'] and str(t)==q['date']:
+    elif act_ and q['n'] and paidn(r)==q['base'] and str(t)==q['date'] and (
+        not q.get('term') or q['start']==str(pstart(r,paidn(r)+1))):
         if q.get('dpart'):left=pay_dl(r,q['dpart'],t);addpay(r,0,q['dpart']-left,0,'qr','СБП',qid,kind='debt')
-        addpay(r,q['n'],q['amt']-q.get('dpart',0),q['pen'],'qr','СБП',qid);ok=True
+        addpay(r,q['n'],round(q['amt']-q.get('dpart',0),2),q['pen'],'qr','СБП',qid,term=q.get('term'));ok=True
     elif act_ and not q['n'] and r.get('dl'):
         left=apply_money(r,'debt',q['amt'],'qr','СБП',qr=qid);ok=True
-    elif r and not q['n'] and not act_ and abs(r.get('debt',0)-q['amt'])<1:
+    elif r and not q['n'] and r.get('status')!='active' and abs(r.get('debt',0)-q['amt'])<1:
         addpay(r,0,q['amt'],0,'qr','СБП',qid,kind='debt');r['debt']=0;ok=True
     if ok:put(q['rent'],'rent',r,'pay-qr','',o)
     c=(doc((r or {}).get('client','')) or {}).get('name','')
@@ -274,7 +356,9 @@ def snapshot(ro,P):
         d=json.loads(d)
         if k=='admin' and ro!='owner':continue
         if k=='exp' and not(fin or 'exp' in P):continue
-        if k=='rent':d['st']=rstate(d,t)
+        if k=='rent':
+            d['st']=rstate(d,t)
+            if fin:d['renewed']=renewed_after_first_term(d,t)
         if k=='bike':
             d['rent']=busy.get(i)
             if not fin:d.pop('cost',None);d.pop('sale',None)
@@ -282,7 +366,7 @@ def snapshot(ro,P):
         out[k][i]=d
     c=cfg();tc=c.pop('tochka',{}) or {}
     c['tochka']={'on':bool(tq()),'merchant':tc.get('merchant',''),'account':tc.get('account',''),'jwt':bool(tc.get('jwt')),'hook':tc.get('hook','')} if ro=='owner' else {'on':bool(tq())}
-    if not fin:c={x:c[x] for x in('week','month','pen','grace','ddays','cdef','cats','tochka')}
+    if not fin:c={x:c[x] for x in('week','month','renewal_rates','pen','grace','ddays','cdef','cats','tochka')}
     return {'docs':out,'cfg':c,'today':str(t)}
 def mine(cid):
     c=doc(cid) or {};a=active_of('client',cid);cf=cfg()
@@ -294,12 +378,13 @@ def mine(cid):
         qr=next(({'id':j,'amt':x['amt'],'n':x['n'],'payload':x['payload'],'img':x.get('img')} for j,x in kind('qr') if x.get('rent')==i and x.get('status')=='open' and x['date']==str(today()) and x['base']==paidn(d)),None)
         bills=[{'id':j,'amt':x['amt'],'kind':x['kind'],'due':x.get('due'),'ts':x['ts']} for j,x in kind('bill') if x.get('rent')==i and x.get('status')=='open']
         r={'id':i,'issued':d.get('issued'),'type':d['type'],'st':st,'q1':q1['amt'],'bills':bills,
-           'pays':[{k:p.get(k) for k in('ts','n','amt','pen','method','kind')} for p in d.get('pays') or []][-30:],'req':req,'qr':qr,
+           'waiting':d.get('waiting'),'terms':list(d.get('rates') or {}),
+           'pays':[{k:p.get(k) for k in('ts','n','amt','pen','method','kind','term')} for p in d.get('pays') or []][-30:],'req':req,'qr':None if d.get('waiting') else qr,
            'defers':[x for x in d.get('defer') or []][-5:]}
     debt=sum(d.get('debt',0) for _,d in kind('rent') if d.get('client')==cid and d.get('status')!='active')
     return {'role':'client','name':c.get('name',''),'rent':r,'debt':debt,'cdef':cf['cdef'],'pen':cf['pen'],'grace':cf['grace'],'qr':bool(tq()),'fio':c.get('name',''),'cphone':cf['cphone'],'ctg':cf['ctg']}
 # ---------- действия ----------
-NEED={'quote':'pay','issue':'rents','return':'rents','price':'rents','contract':'rents','pay':'pay','paydebt':'pay','qr':'pay','qrcancel':'pay','unk':'pay',
+NEED={'quote':'pay','issue':'rents','return':'rents','waitreturn':'rents','rates':'rents','rentnote':'rents','price':'rents','contract':'rents','pay':'pay','paydebt':'pay','qr':'pay','qrcancel':'pay','unk':'pay',
 'defer':'defer','undefer':'defer','nopen':'pen','waive':'pen','paypart':'partial','paydl':'pay','bill':'bill','billvoid':'bill','billpaid':'pay','req':'defer','seize':'seize','client':'clients','black':'clients','archive':'clients','unarchive':'clients','bike':'bikes','bikestat':'bikes','exp':'exp','expdel':'exp'}
 OWNERONLY={'cfg','admin','admindel','fix','paydel','purge'}
 def archive(i,d,why,by,o):
@@ -395,33 +480,81 @@ def act(a,b,ro,P,by):
         if c.get('arch'):raise Bad('Клиент в архиве. Сначала верните его из архива.')
         if active_of('client',ci):raise Bad('У клиента уже есть активная аренда')
         if active_of('bike',bi) or bk.get('status')!='free':raise Bad('Велосипед не свободен')
-        ty=b.get('type')
-        if ty not in LEN:raise Bad('Выберите неделю или месяц')
+        term=b.get('term')
+        if 'term' in b:
+            if not isinstance(term,str) or term not in TERM_DAYS:raise Bad('Выберите первый срок аренды')
+            rates=rate_prices(b.get('rates',cfg()['renewal_rates']))
+            ty='m' if term=='m' else 'w'
+            price=rates[ty]
+            method=b.get('method')
+            if method not in ('cash','transfer','no'):raise Bad('Выберите способ оплаты')
+            n=int(method!='no')
+        else:
+            ty=b.get('type')
+            if ty not in BASE_TERMS:raise Bad('Выберите неделю или месяц')
+            price=num(b.get('price'),1)
+            method='transfer' if b.get('method')=='transfer' else 'cash'
+            n=int(b.get('payn') or 0)
         iss=day(b.get('date') or t)
         if iss>t:raise Bad('Дата выдачи не может быть в будущем')
         if iss<t-dt.timedelta(days=60):raise Bad('Дата выдачи слишком давняя')
-        r={'client':ci,'bike':bi,'type':ty,'price':num(b.get('price'),1),'issued':str(iss),'free':bool(b.get('free')),
+        r={'client':ci,'bike':bi,'type':ty,'price':price,'issued':str(iss),'free':bool(b.get('free')),
            'start':str(iss+dt.timedelta(days=1 if b.get('free') else 0)),'status':'active','pays':[],'by':by,'contract':txt(b.get('contract'),40)}
-        if b.get('first') is not None:r['once']={'1':num(b.get('first'),1)}
-        i=nid();n=int(b.get('payn') or 0)
+        if term:r.update(rates=rates,initial={'term':term,'price':rates[term]})
+        if b.get('first') not in (None,''):r['once']={'1':num(b.get('first'),1)}
+        i=nid()
         if n:
-            q=quote(r,n,iss);addpay(r,n,q['amt'],q['pen'],'cash' if b.get('method')!='transfer' else 'transfer',by,
+            q=term_quote(r,n,term,iss);addpay(r,n,q['amt'],q['pen'],method,by,term=term,
                 ts=None if iss==t else dt.datetime.combine(iss,now().time(),MSK).isoformat(timespec='seconds'))
         put(i,'rent',r,'issue',by);return {'id':i}
     if a=='quote':
         i,r=get('rent',b.get('id'));n=int(b.get('n') or 1)
-        if r.get('status')!='active' or not 1<=n<=24:raise Bad('Нечего оплачивать')
-        q=quote(r,n);return {'amt':q['amt'],'pen':q['pen'],'from':q['items'][0]['start'],'to':str(D(q['items'][-1]['start'])+dt.timedelta(days=LEN[q['items'][-1]['type']]-1))}
-    if a in('pay','paydebt','qr','qrcancel','return','seize','price','defer','undefer','contract','fix','paydel','nopen','waive','paypart','paydl','bill','billvoid','billpaid'):
+        if r.get('status')!='active' or r.get('waiting') or not 1<=n<=24:raise Bad('Нечего оплачивать')
+        q=term_quote(r,n,b.get('term'))
+        q['dl']=dstate(r,t)['dl'] if b.get('debt') else 0
+        q['amt']=round(q['amt']+q['dl'],2)
+        return q
+    if a in('pay','paydebt','qr','qrcancel','return','waitreturn','rates','rentnote','seize','price','defer','undefer','contract','fix','paydel','nopen','waive','paypart','paydl','bill','billvoid','billpaid'):
         i,r=get('rent',b.get('id'));need_v(b,r);o=json.loads(json.dumps(r))
         act_=r.get('status')=='active'
-        if a in('pay','qr','return','seize','price','defer','undefer','fix','nopen','waive','paypart','paydl','bill','billvoid','billpaid') and not act_ and not(a=='qr' and r.get('debt')):raise Bad('Аренда уже закрыта')
+        if a in('pay','qr','return','waitreturn','rates','seize','price','defer','undefer','fix','nopen','waive','paypart','paydl','bill','billvoid','billpaid') and not act_ and not(a=='qr' and r.get('debt')):raise Bad('Аренда уже закрыта')
+        if a=='rentnote':
+            r['note']=txt(b.get('note'),500);put(i,'rent',r,'rentnote',by,o);return {}
+        if a=='waitreturn':
+            if r.get('waiting'):return {}
+            r['waiting']=str(t)
+            void_bills(i,by)
+            for j,x in kind('req'):
+                if x.get('rent')==i and x.get('status')=='pending':
+                    ox=dict(x);x['status']='no';put(j,'req',x,'req',by,ox)
+            put(i,'rent',r,'waitreturn',by,o);return {}
+        if act_ and r.get('waiting') and a not in ('return','contract','qrcancel','seize'):
+            raise Bad('Аренда ждёт возврата')
+        if a=='rates':
+            values=b.get('rates')
+            if values=={}:r.pop('rates',None)
+            else:r['rates']=rate_prices(values)
+            k=paidn(r)+1
+            schedule=b.get('schedule')
+            if schedule is not None:
+                if not isinstance(schedule,dict):raise Bad('Укажите базовый период и цену')
+                ty=schedule.get('type')
+                if ty not in BASE_TERMS:raise Bad('Неверный период')
+                price=num(schedule.get('price'),1)
+                if (ty,price)!=recurring_plan(r,k):set_plan(r,k,ty,price,t,by)
+            if 'first' in b:
+                first=b['first']
+                if first is None or first=='':(r.get('once') or {}).pop(str(k),None)
+                else:r.setdefault('once',{})[str(k)]=num(first,1)
+            put(i,'rent',r,'rates',by,o);return {}
         if a=='pay':
             n=int(b.get('n') or 1)
             if not 1<=n<=24:raise Bad('Неверное число периодов')
             m=b.get('method')
             if m not in('cash','transfer','qr'):raise Bad('Выберите способ оплаты')
-            q=quote(r,n);addpay(r,n,q['amt'],q['pen'],m,by);put(i,'rent',r,'pay',by,o)
+            term=b.get('term') or None
+            q=term_quote(r,n,term);check_amount(b,q['amt'])
+            addpay(r,1 if term else n,q['amt'],q['pen'],m,by,term=term);put(i,'rent',r,'pay',by,o)
             # открытые QR этой аренды больше не действуют
             for j,x in kind('qr'):
                 if x.get('rent')==i and x.get('status')=='open':ox=dict(x);x['status']='void';put(j,'qr',x,'qr-void',by,ox)
@@ -480,7 +613,8 @@ def act(a,b,ro,P,by):
                 return {'qr':new_qr(i,r,0,by,bill=(j,x))}
             n=0 if (not act_ or b.get('debtonly')) else int(b.get('n') or 1)
             if act_ and not b.get('debtonly') and not 1<=n<=12:raise Bad('Неверное число периодов')
-            return {'qr':new_qr(i,r,n,by,debt=bool(b.get('debt')))}
+            term=(b.get('term') or None) if n else None
+            return {'qr':new_qr(i,r,1 if term else n,by,debt=bool(b.get('debt')),term=term,expected=b.get('expected'))}
         if a=='qrcancel':
             j,x=get('qr',b.get('qr'))
             if x.get('status')=='open':ox=dict(x);x['status']='void';put(j,'qr',x,'qr-void',by,ox)
@@ -491,12 +625,12 @@ def act(a,b,ro,P,by):
             ps.pop(k);put(i,'rent',r,'paydel',by,o);return {}
         if a=='price':
             p=num(b.get('price'),1);k=paidn(r)+1;ty=b.get('type') or plan(r,k)[0]
-            if ty not in LEN:raise Bad('Неверный период')
+            if ty not in BASE_TERMS:raise Bad('Неверный период')
             if b.get('once'):
                 if ty!=plan(r,k)[0]:raise Bad('Разовая цена не меняет период')
                 r.setdefault('once',{})[str(k)]=p
             else:
-                r['plan']=[c for c in r.get('plan') or [] if c['k']<k]+[{'k':k,'type':ty,'price':p,'ts':str(t),'by':by}]
+                set_plan(r,k,ty,p,t,by)
                 r.get('once',{}).pop(str(k),None)
             put(i,'rent',r,'price',by,o);return {}
         if a=='defer':
@@ -520,7 +654,7 @@ def act(a,b,ro,P,by):
             put(i,'rent',r,'fix',by,o);return {}
         st=rstate(r,t)
         if a=='return':
-            debt=num(b.get('debt') if b.get('debt') is not None else st['debt']+st['dl']);ref=num(b.get('refund') or 0)
+            debt=num(b.get('debt') or 0);ref=num(b.get('refund') or 0)
             r.update(status='closed',closed=str(t),debt=debt,refund={'amt':ref,'date':str(t)} if ref else None,debt0=st['debt']+st['dl'],dl=[])
             void_bills(i,by)
             put(i,'rent',r,'return',by,o);return {}
@@ -533,10 +667,13 @@ def act(a,b,ro,P,by):
         i,u=get('unk',b.get('id'));o=dict(u)
         if u.get('status')!='open':raise Bad('Уже разобрано')
         if b.get('do')=='apply':
-            ri,r=get('rent',b.get('rent'));n=int(b.get('n') or 0);ro_=json.loads(json.dumps(r))
+            ri,r=get('rent',u['rent']);n=int(b.get('n') or (1 if b.get('term') else 0));ro_=json.loads(json.dumps(r))
             if r.get('status')=='active':
+                if r.get('waiting'):raise Bad('Аренда ждёт возврата')
                 if not 1<=n<=24:raise Bad('Укажите число периодов')
-                addpay(r,n,u['amt'],0,'qr',by,u.get('qr'))
+                term=b.get('term')
+                if term and (not isinstance(term,str) or term not in TERM_DAYS):raise Bad('Неверный срок оплаты')
+                addpay(r,1 if term else n,u['amt'],0,'qr',by,u.get('qr'),term=term)
             else:addpay(r,0,u['amt'],0,'qr',by,u.get('qr'),kind='debt');r['debt']=max(0,r.get('debt',0)-u['amt'])
             put(ri,'rent',r,'unk-apply',by,ro_);u['status']='applied';u['to']=ri
         else:u['status']='done';u['note']=txt(b.get('note'),200)
@@ -545,7 +682,7 @@ def act(a,b,ro,P,by):
         i,q=get('req',b.get('id'));o=dict(q)
         if q.get('status')!='pending':raise Bad('Заявка уже рассмотрена')
         ri,r=get('rent',q['rent'])
-        if b.get('ok') and r.get('status')=='active':
+        if b.get('ok') and r.get('status')=='active' and not r.get('waiting'):
             ro_=json.loads(json.dumps(r));ns=D(rstate(r,t)['next'])
             u=max(ns,t)+dt.timedelta(days=q['days'])
             r.setdefault('defer',[]).append({'from':str(t),'until':str(u),'by':by,'ts':now().isoformat(timespec='seconds'),'req':i})
@@ -554,8 +691,12 @@ def act(a,b,ro,P,by):
         q['by']=by;put(i,'req',q,'req',by,o);return {}
     if a=='cfg':
         old=doc('cfg');c=cfg();o=json.loads(json.dumps(old or {}))
-        for k in('week','month'):c[k]=num(b.get(k,c[k]),1)
-        c['pen']=num(b.get('pen',c['pen']),0,100);c['tax']=num(b.get('tax',c['tax']),0,100);c['acq']=num(b.get('acq',c['acq']),0,100)
+        if 'renewal_rates' in b:
+            c['renewal_rates']=rate_prices(b['renewal_rates'])
+            c['week']=c['renewal_rates']['w'];c['month']=c['renewal_rates']['m']
+        else:
+            for k in ('week','month'):c[k]=num(b.get(k,c[k]),1)
+        for k in ('pen','tax','acq','receipt'):c[k]=num(b.get(k,c[k]),0,100)
         c['cdef']=int(num(b.get('cdef',c['cdef']),0,3));c['grace']=int(num(b.get('grace',c['grace']),0,10));c['ddays']=int(num(b.get('ddays',c['ddays']),1,60));c['archdays']=int(num(b.get('archdays',c['archdays']),0,365))
         c['cphone']=txt(b.get('cphone',c['cphone']),30);c['ctg']=txt(b.get('ctg',c['ctg']),40).lstrip('@').replace('https://t.me/','')
         c['nown']=bool(b.get('nown',c['nown']));c['ncli']=bool(b.get('ncli',c['ncli']))
@@ -588,11 +729,14 @@ def client_act(cid,b):
     a=active_of('client',cid)
     if not a:raise Bad('Активной аренды нет')
     i,r=a
+    if r.get('waiting'):raise Bad('Аренда ждёт возврата')
     if b.get('a')=='quote':
         n=int(b.get('n') or 1)
         if not 1<=n<=6:raise Bad('Неверное число периодов')
-        q=quote(r,n);dp=dstate(r,today())['dl'] if b.get('debt') else 0
-        return {'amt':q['amt']+dp,'pen':q['pen'],'dl':dp,'to':str(D(q['items'][-1]['start'])+dt.timedelta(days=LEN[q['items'][-1]['type']]-1))}
+        q=term_quote(r,n,b.get('term'))
+        q['dl']=dstate(r,today())['dl'] if b.get('debt') else 0
+        q['amt']=round(q['amt']+q['dl'],2)
+        return q
     if b.get('a')=='qr' and b.get('bill'):
         j,x=get('bill',b['bill'])
         if x.get('rent')!=i or x.get('status')!='open':raise Bad('Платёж уже закрыт')
@@ -605,9 +749,17 @@ def client_act(cid,b):
     if b.get('a')=='qr':
         n=int(b.get('n') or 1)
         if not 1<=n<=6:raise Bad('Неверное число периодов')
+        term=b.get('term') or None
+        if term:n=1
+        q=term_quote(r,n,term)
+        debt=dstate(r,today())['dl'] if b.get('debt') else 0
+        check_amount(b,q['amt']+debt)
         for j,x in kind('qr'):
-            if x.get('rent')==i and x.get('status')=='open' and x['date']==str(today()) and x['base']==paidn(r) and x['n']==n and not x.get('bill') and bool(x.get('dpart'))==bool(b.get('debt')):return {'qr':j}
-        return {'qr':new_qr(i,r,n,'клиент',debt=bool(b.get('debt')))}
+            if (x.get('rent')==i and x.get('status')=='open' and x['date']==str(today())
+                and x['base']==paidn(r) and x['n']==n and not x.get('bill') and x.get('term')==term
+                and x.get('dpart',0)==debt and round(x['amt'],2)==round(q['amt']+debt,2)
+                and (not term or x.get('start')==q['from'])):return {'qr':j}
+        return {'qr':new_qr(i,r,n,'клиент',debt=bool(debt),term=term,expected=b.get('expected'))}
     if b.get('a')=='req':
         n=int(b.get('days') or 0);mx=cfg()['cdef']
         if not 1<=n<=mx:raise Bad(f'Отсрочку можно попросить на 1–{mx} дн.')
@@ -705,9 +857,12 @@ class H(BaseHTTPRequestHandler):
             with L:
                 ro,x=role(u);q=ID.fullmatch(p[8:]) and doc(p[8:])
                 if not q or 'payload' not in q:return s.send(404,{})
-                if ro=='client' and (doc(q['rent']) or {}).get('client')!=x:return s.send(403,{})
+                r=doc(q['rent']) or {}
+                if ro=='client' and r.get('client')!=x:return s.send(403,{})
                 if ro not in('owner','admin','client'):return s.send(403,{})
-                return s.send(200,{k:q.get(k) for k in('amt','n','pen','payload','img','status','date')})
+                out={k:q.get(k) for k in('amt','n','pen','payload','img','status','date')}
+                if r.get('status')=='active' and r.get('waiting') and out['status']=='open':out['status']='void'
+                return s.send(200,out)
         if p.startswith('/img/'):
             t=time.time()
             for a in [a for a,(e,_) in IMG.items() if e<t]:IMG.pop(a,None)
@@ -813,7 +968,7 @@ def morning(t):
         def once(k):
             if db.execute('select 1 from ntf where k=?',(k,)).fetchone():return False
             db.execute('insert into ntf values(?)',(k,));return True
-        rs=[(i,r,rstate(r,t)) for i,r in kind('rent') if r.get('status')=='active']
+        rs=[(i,r,rstate(r,t)) for i,r in kind('rent') if r.get('status')=='active' and not r.get('waiting')]
         if cf['nown'] and once(f'{t}:daily'):
             late=sum(1 for _,_,s in rs if s['late']>0);due=sum(1 for _,_,s in rs if s['left']==0)
             rq=sum(1 for _,x in kind('req') if x.get('status')=='pending')
