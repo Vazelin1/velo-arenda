@@ -14,12 +14,22 @@ FAIL={};TRY={};UN={};BOT=[os.environ.get('BOT_USERNAME','').lstrip('@') or None]
 HD={'X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','Strict-Transport-Security':'max-age=31536000',
 'Content-Security-Policy':"default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'self' https://*.telegram.org"}
 KINDS=('cfg','admin','client','bike','rent','exp','qr','unk','req','bill')
-PERMS=('pay','partial','bill','defer','pen','rents','seize','clients','bikes','exp','reports')
+PERMS=('rent_issue','rent_return','rent_rates','rent_note','rent_contract','rent_date','seize',
+       'pay_accept','partial','bill','pay_qr','pay_review','pay_delete','defer_manual','defer_requests','pen_toggle','pen_waive',
+       'client_edit','client_archive','client_block','client_access','bike_edit','bike_status','exp','reports')
+LEGACY_PERMS={
+    'rents':('rent_issue','rent_return','rent_rates','rent_note','rent_contract'),
+    'pay':('pay_accept','pay_qr','pay_review'),
+    'defer':('defer_manual','defer_requests'),
+    'pen':('pen_toggle','pen_waive'),
+    'clients':('client_edit','client_archive','client_block','client_access'),
+    'bikes':('bike_edit','bike_status'),
+}
 BASE_TERMS=('w','m')
 TERM_DAYS={'w':7,'w2':14,'w3':21,'m':30}
 DEFAULT_RATES={'w':3700,'w2':7300,'w3':10800,'m':15000}
 DEF={'week':DEFAULT_RATES['w'],'month':DEFAULT_RATES['m'],'renewal_rates':DEFAULT_RATES,
-'pen':5,'grace':2,'ddays':3,'archdays':30,'cphone':'','ctg':'','tax':7,'acq':0,'receipt':0,'cdef':3,'nown':False,'ncli':False,
+'pen':5,'grace':2,'ddays':3,'archdays':30,'cphone':'','ctg':'','cmax':'','tax':7,'acq':0,'receipt':0,'cdef':3,'nown':False,'ncli':False,
 'cats':['Ремонт','Запчасти','Обслуживание','Реклама','Зарплата','Аренда помещения','Прочее']}
 ID=re.compile(r'[a-z0-9]{1,16}')
 D=dt.date.fromisoformat
@@ -43,6 +53,22 @@ def day(x):
     try:return D(str(x))
     except Exception:raise Bad('Неверная дата')
 def txt(x,n=200):return str(x or '').strip()[:n]
+def admin_permissions(values):
+    return [p for p in PERMS if p in values or any(k in values and p in group for k,group in LEGACY_PERMS.items())]
+def chat_url(raw,telegram=False):
+    value=txt(raw,2048)
+    if not value:return ''
+    if telegram and '://' not in value:
+        if value.lower().startswith(('t.me/','telegram.me/')):value='https://'+value
+        elif re.fullmatch(r'@?[\w+/-]+(?:\?[^\s:]*)?',value):value='https://t.me/'+value.lstrip('@')
+    try:
+        p=urllib.parse.urlsplit(value)
+        if p.scheme=='https' and p.hostname and p.port!=0 and p.username is None and not re.search(r'[\s\x00-\x1f\\]',value):
+            return value
+    except ValueError:pass
+    return ''
+def contact_data(c):
+    return {'cphone':c['cphone'],'ctg':chat_url(c['ctg'],telegram=True),'cmax':chat_url(c['cmax'])}
 # ---------- хранилище ----------
 def row(i):
     r=db.execute('select kind,data from docs where id=?',(i,)).fetchone();return r and (r[0],json.loads(r[1]))
@@ -50,10 +76,12 @@ def doc(i):
     r=row(i);return r and r[1]
 def kind(k):return [(i,json.loads(d)) for i,d in db.execute('select id,data from docs where kind=?',(k,))]
 def save(i,k,d):db.execute('insert or replace into docs values(?,?,?)',(i,k,json.dumps(d,ensure_ascii=False)))
-def put(i,k,d,act,who,old=None):
+def write_log(action,by,i,old=None,new=None):
+    encode=lambda x:json.dumps({a:b for a,b in x.items() if a!='img'},ensure_ascii=False) if x else None
+    db.execute('insert into log values(?,?,?,?,?)',(now().isoformat(),action+('@'+by if by else ''),i,encode(old),encode(new)))
+def put(i,k,d,act,who,old=None,audit=None):
     d['_v']=(old or {}).get('_v',0)+1;save(i,k,d)
-    lj=lambda x:x and json.dumps({a:b for a,b in x.items() if a!='img'},ensure_ascii=False)
-    db.execute('insert into log values(?,?,?,?,?)',(now().isoformat(),act+(who and '@'+who or ''),i,lj(old),lj(d)))
+    write_log(act,who,i,old,{**d,'_audit':audit} if audit else d)
 def cfg():return {**DEF,**(doc('cfg') or {})}
 # ---------- Telegram ----------
 def who(init):
@@ -354,7 +382,9 @@ def snapshot(ro,P):
     for i,k,d in db.execute('select id,kind,data from docs'):
         if k=='cfg':continue
         d=json.loads(d)
-        if k=='admin' and ro!='owner':continue
+        if k=='admin':
+            if ro!='owner':continue
+            d['perms']=admin_permissions(d.get('perms') or [])
         if k=='exp' and not(fin or 'exp' in P):continue
         if k=='rent':
             d['st']=rstate(d,t)
@@ -362,9 +392,12 @@ def snapshot(ro,P):
         if k=='bike':
             d['rent']=busy.get(i)
             if not fin:d.pop('cost',None);d.pop('sale',None)
-        if k=='qr':d.pop('img',None)
+        if k=='qr':
+            d.pop('img',None)
+            if ro!='owner' and 'pay_qr' not in P:d.pop('payload',None);d.pop('tid',None)
         out[k][i]=d
     c=cfg();tc=c.pop('tochka',{}) or {}
+    c.update(contact_data(c))
     c['tochka']={'on':bool(tq()),'merchant':tc.get('merchant',''),'account':tc.get('account',''),'jwt':bool(tc.get('jwt')),'hook':tc.get('hook','')} if ro=='owner' else {'on':bool(tq())}
     if not fin:c={x:c[x] for x in('week','month','renewal_rates','pen','grace','ddays','cdef','cats','tochka')}
     return {'docs':out,'cfg':c,'today':str(t)}
@@ -382,11 +415,17 @@ def mine(cid):
            'pays':[{k:p.get(k) for k in('ts','n','amt','pen','method','kind','term')} for p in d.get('pays') or []][-30:],'req':req,'qr':None if d.get('waiting') else qr,
            'defers':[x for x in d.get('defer') or []][-5:]}
     debt=sum(d.get('debt',0) for _,d in kind('rent') if d.get('client')==cid and d.get('status')!='active')
-    return {'role':'client','name':c.get('name',''),'rent':r,'debt':debt,'cdef':cf['cdef'],'pen':cf['pen'],'grace':cf['grace'],'qr':bool(tq()),'fio':c.get('name',''),'cphone':cf['cphone'],'ctg':cf['ctg']}
+    return {'role':'client','name':c.get('name',''),'rent':r,'debt':debt,'cdef':cf['cdef'],'pen':cf['pen'],'grace':cf['grace'],'qr':bool(tq()),'fio':c.get('name',''),**contact_data(cf)}
 # ---------- действия ----------
-NEED={'quote':'pay','issue':'rents','return':'rents','waitreturn':'rents','rates':'rents','rentnote':'rents','price':'rents','contract':'rents','pay':'pay','paydebt':'pay','qr':'pay','qrcancel':'pay','unk':'pay',
-'defer':'defer','undefer':'defer','nopen':'pen','waive':'pen','paypart':'partial','paydl':'pay','bill':'bill','billvoid':'bill','billpaid':'pay','req':'defer','seize':'seize','client':'clients','black':'clients','archive':'clients','unarchive':'clients','bike':'bikes','bikestat':'bikes','exp':'exp','expdel':'exp'}
-OWNERONLY={'cfg','admin','admindel','fix','paydel','purge'}
+NEED={'issue':'rent_issue','return':'rent_return','waitreturn':'rent_return','rates':'rent_rates','rentnote':'rent_note',
+      'price':'rent_rates','contract':'rent_contract','fix':'rent_date','seize':'seize',
+      'pay':'pay_accept','paydebt':'pay_accept','paydl':'pay_accept','billpaid':'pay_accept','paypart':'partial',
+      'bill':'bill','billvoid':'bill','qr':'pay_qr','qrcancel':'pay_qr','unk':'pay_review','paydel':'pay_delete',
+      'defer':'defer_manual','undefer':'defer_manual','req':'defer_requests','nopen':'pen_toggle','waive':'pen_waive',
+      'client':'client_edit','black':'client_block','archive':'client_archive','unarchive':'client_archive',
+      'bike':'bike_edit','bikestat':'bike_status','exp':'exp','expdel':'exp'}
+QUOTE_PERMS={'pay_accept','partial','pay_qr','bill'}
+OWNERONLY={'cfg','admin','admindel','purge'}
 def archive(i,d,why,by,o):
     """Клиент уходит в архив: скрыт из списков и выдачи, вход и ссылки сброшены. Аренды и платежи остаются."""
     d['arch']=str(today());d['archwhy']=why;put(i,'client',d,'archive',by,o)
@@ -416,8 +455,9 @@ def void_bills(rid,by):
 def act(a,b,ro,P,by):
     """Выполняет действие главного аккаунта или администратора. Возвращает ответ (dict). Вызывать под замком."""
     if a in OWNERONLY and ro!='owner':raise PermissionError
-    if a in NEED and ro=='admin' and NEED[a] not in P:raise PermissionError
-    if a not in NEED and a not in OWNERONLY:raise Bad('Неизвестное действие')
+    if ro=='admin' and a in NEED and NEED[a] not in P:raise PermissionError
+    if ro=='admin' and a=='quote' and not QUOTE_PERMS.intersection(P):raise PermissionError
+    if a not in NEED and a not in OWNERONLY and a!='quote':raise Bad('Неизвестное действие')
     t=today()
     if a=='client':
         i=str(b.get('id') or nid());old=doc(i) if b.get('id') else None
@@ -446,7 +486,7 @@ def act(a,b,ro,P,by):
         nd={'name':'Удалённый клиент','phone':'','purged':str(t),'arch':d.get('arch'),'archwhy':d.get('archwhy'),'created':d.get('created'),'_v':d.get('_v',0)+1}
         save(i,'client',nd);db.execute('delete from bind where client=?',(i,));db.execute('delete from inv where client=?',(i,))
         db.execute('update log set old=NULL,new=NULL where id=?',(i,))
-        db.execute('insert into log values(?,?,?,?,?)',(now().isoformat(),'purge@'+by,i,None,None));return {}
+        write_log('purge',by,i);return {}
     if a=='black':
         i,d=get('client',b.get('id'));o=dict(d);d['black']=bool(b.get('on'));d['bnote']=txt(b.get('note'),300);put(i,'client',d,'black',by,o);return {}
     if a=='bike':
@@ -474,7 +514,7 @@ def act(a,b,ro,P,by):
         put(i,'exp',d,'exp',by,old);return {'id':i}
     if a=='expdel':
         i,d=get('exp',b.get('id'));db.execute('delete from docs where id=?',(i,))
-        db.execute('insert into log values(?,?,?,?,?)',(now().isoformat(),'expdel@'+by,i,json.dumps(d,ensure_ascii=False),None));return {}
+        write_log('expdel',by,i,old=d);return {}
     if a=='issue':
         ci,c=get('client',b.get('client'));bi,bk=get('bike',b.get('bike'))
         if c.get('arch'):raise Bad('Клиент в архиве. Сначала верните его из архива.')
@@ -617,11 +657,13 @@ def act(a,b,ro,P,by):
             return {'qr':new_qr(i,r,1 if term else n,by,debt=bool(b.get('debt')),term=term,expected=b.get('expected'))}
         if a=='qrcancel':
             j,x=get('qr',b.get('qr'))
+            if x.get('rent')!=i:raise Bad('QR относится к другой аренде')
             if x.get('status')=='open':ox=dict(x);x['status']='void';put(j,'qr',x,'qr-void',by,ox)
             return {}
         if a=='paydel':
             k=int(b.get('k',-1));ps=r.get('pays') or []
             if not 0<=k<len(ps):raise Bad('Платёж не найден')
+            if ro=='admin' and (ps[k].get('old') or ps[k].get('method') not in ('cash','transfer')):raise PermissionError
             ps.pop(k);put(i,'rent',r,'paydel',by,o);return {}
         if a=='price':
             p=num(b.get('price'),1);k=paidn(r)+1;ty=b.get('type') or plan(r,k)[0]
@@ -651,7 +693,7 @@ def act(a,b,ro,P,by):
             r['contract']=txt(b.get('contract'),40);put(i,'rent',r,'contract',by,o);return {}
         if a=='fix':
             nx=day(b.get('next'));cur=D(rstate(r,t)['next']);r['shift']=r.get('shift',0)+(nx-cur).days
-            put(i,'rent',r,'fix',by,o);return {}
+            put(i,'rent',r,'fix',by,o,audit={'from':str(cur),'to':str(nx)});return {}
         st=rstate(r,t)
         if a=='return':
             debt=num(b.get('debt') or 0);ref=num(b.get('refund') or 0)
@@ -698,7 +740,13 @@ def act(a,b,ro,P,by):
             for k in ('week','month'):c[k]=num(b.get(k,c[k]),1)
         for k in ('pen','tax','acq','receipt'):c[k]=num(b.get(k,c[k]),0,100)
         c['cdef']=int(num(b.get('cdef',c['cdef']),0,3));c['grace']=int(num(b.get('grace',c['grace']),0,10));c['ddays']=int(num(b.get('ddays',c['ddays']),1,60));c['archdays']=int(num(b.get('archdays',c['archdays']),0,365))
-        c['cphone']=txt(b.get('cphone',c['cphone']),30);c['ctg']=txt(b.get('ctg',c['ctg']),40).lstrip('@').replace('https://t.me/','')
+        c['cphone']=txt(b.get('cphone',c['cphone']),30)
+        for field,label in (('ctg','Telegram'),('cmax','МАКС')):
+            if field in b:
+                value=txt(b[field],2048)
+                link=chat_url(value,telegram=field=='ctg')
+                if value and not link:raise Bad(f'Укажите действующую HTTPS-ссылку для контакта в {label}')
+                c[field]=link
         c['nown']=bool(b.get('nown',c['nown']));c['ncli']=bool(b.get('ncli',c['ncli']))
         if isinstance(b.get('cats'),list):c['cats']=[txt(x,40) for x in b['cats'] if txt(x,40)][:30] or DEF['cats']
         if isinstance(b.get('tochka'),dict):
@@ -709,21 +757,23 @@ def act(a,b,ro,P,by):
             tc.setdefault('hook',secrets.token_urlsafe(18)) if tc else None
             c['tochka']=tc
         c['_v']=(old or {}).get('_v',0)+1;save('cfg','cfg',c)
-        if o.get('tochka',{}).get('jwt'):o['tochka']['jwt']='***'
+        if (o.get('tochka') or {}).get('jwt'):o['tochka']['jwt']='***'
         lg=dict(c)
-        if lg.get('tochka',{}).get('jwt'):lg['tochka']=dict(lg['tochka'],jwt='***')
-        db.execute('insert into log values(?,?,?,?,?)',(now().isoformat(),'cfg',  'cfg',json.dumps(o,ensure_ascii=False),json.dumps(lg,ensure_ascii=False)));return {}
+        if (lg.get('tochka') or {}).get('jwt'):lg['tochka']=dict(lg['tochka'],jwt='***')
+        if isinstance(b.get('tochka'),dict) and b['tochka'].get('jwt'):lg['_audit']={'bank_key_changed':True}
+        write_log('cfg',by,'cfg',o,lg);return {}
     if a=='admin':
         i=str(b.get('id') or nid());old=None
-        if b.get('id'):i,old=get('admin',i)
+        if b.get('id'):
+            i,old=get('admin',i);old['perms']=admin_permissions(old.get('perms') or [])
         nm=txt(b.get('name'),60);ph=txt(b.get('phone'),30)
         if not nm or not digits(ph):raise Bad('Укажите имя и телефон')
         pl=b.get('perms') if isinstance(b.get('perms'),list) else []
-        d={'name':nm,'phone':ph,'perms':[q for q in PERMS if q in pl],'tg':(old or {}).get('tg'),'tgu':(old or {}).get('tgu',''),'disabled':bool(b.get('disabled')),'created':(old or {}).get('created',str(t)),'m2':1}
+        d={'name':nm,'phone':ph,'perms':admin_permissions(pl),'tg':(old or {}).get('tg'),'tgu':(old or {}).get('tgu',''),'disabled':bool(b.get('disabled')),'created':(old or {}).get('created',str(t)),'m2':1}
         put(i,'admin',d,'admin',by,old);return {'id':i}
     if a=='admindel':
         i,d=get('admin',b.get('id'));db.execute('delete from docs where id=?',(i,))
-        db.execute('insert into log values(?,?,?,?,?)',(now().isoformat(),'admindel',i,json.dumps(d,ensure_ascii=False),None));return {}
+        write_log('admindel',by,i,old=d);return {}
     raise Bad('Неизвестное действие')
 def client_act(cid,b):
     a=active_of('client',cid)
@@ -809,7 +859,7 @@ def restore(b):
             db.execute('delete from docs');db.execute('delete from bind');db.execute('delete from inv')
             db.executemany('insert into docs values(?,?,?)',rows);db.executemany('insert or replace into bind values(?,?)',bi)
             if empty:db.executemany('insert into log values(?,?,?,?,?)',lg)
-            db.execute('insert into log values(?,?,?,?,?)',(now().isoformat(),'restore','',None,json.dumps({'docs':len(rows),'from':b.get('ts')})));db.commit()
+            write_log('restore','Вы','',new={'docs':len(rows),'from':b.get('ts')});db.commit()
             migrate()
         except Exception as e:
             db.rollback();print('restore',e);return 500,'Не удалось загрузить, данные не изменены.'
@@ -839,17 +889,19 @@ class H(BaseHTTPRequestHandler):
                 ro,x=role(u)
                 if p=='/api/all':
                     if ro not in('owner','admin'):return s.send(403,{})
-                    r=snapshot(ro,set(x[1].get('perms',[])) if ro=='admin' else set(PERMS))
+                    permissions=admin_permissions(x[1].get('perms') or []) if ro=='admin' else PERMS
+                    r=snapshot(ro,set(permissions))
+                    if ro=='admin':r['perms']=permissions
                 elif p=='/api/log':
                     if ro!='owner':return s.send(403,{})
                     r=[list(q) for q in db.execute('select ts,act,id,old,new from log order by rowid desc limit 300')]
                 elif ro=='owner':r={'role':'owner','backup':bget(),'empty':not db.execute("select 1 from docs where kind in('rent','bike','client') limit 1").fetchone()}
-                elif ro=='admin':r={'role':'admin','name':x[1].get('name',''),'perms':[q for q in x[1].get('perms',[]) if q in PERMS]}
+                elif ro=='admin':r={'role':'admin','name':x[1].get('name',''),'perms':admin_permissions(x[1].get('perms') or [])}
                 elif ro=='client':
                     c=doc(x);un=UN.get(u,'')
                     if c and c.get('tgu','')!=un:c['tgu']=un;save(x,'client',c);db.commit()
                     r=mine(x)
-                else:cf=cfg();r={'role':ro,'cphone':cf['cphone'],'ctg':cf['ctg']}
+                else:r={'role':ro,**contact_data(cfg())}
             return s.send(200,r)
         if p.startswith('/api/qr/'):
             u=s.user()
@@ -859,6 +911,7 @@ class H(BaseHTTPRequestHandler):
                 if not q or 'payload' not in q:return s.send(404,{})
                 r=doc(q['rent']) or {}
                 if ro=='client' and r.get('client')!=x:return s.send(403,{})
+                if ro=='admin' and 'pay_qr' not in admin_permissions(x[1].get('perms') or []):return s.send(403,{})
                 if ro not in('owner','admin','client'):return s.send(403,{})
                 out={k:q.get(k) for k in('amt','n','pen','payload','img','status','date')}
                 if r.get('status')=='active' and r.get('waiting') and out['status']=='open':out['status']='void'
@@ -896,8 +949,9 @@ class H(BaseHTTPRequestHandler):
         if p=='/api/qrimg':
             # картинка QR, нарисованная в приложении: храним 10 минут, чтобы Telegram мог её скачать
             import base64
-            with L:ro_,_=role(u)
+            with L:ro_,admin=role(u)
             if ro_ not in('owner','admin','client'):return s.send(403,{})
+            if ro_=='admin' and 'pay_qr' not in admin_permissions(admin[1].get('perms') or []):return s.send(403,{})
             try:png=base64.b64decode(str(b.get('png','')).split(',')[-1],validate=True)
             except Exception:return s.send(400,{})
             if not png.startswith(b'\x89PNG') or len(png)>400000:return s.send(400,{})
@@ -911,7 +965,7 @@ class H(BaseHTTPRequestHandler):
             ro,x=role(u)
             try:
                 if ro in('owner','admin') and p=='/api/act':
-                    P=set(x[1].get('perms',[])) if ro=='admin' else set(PERMS)
+                    P=set(admin_permissions(x[1].get('perms') or [])) if ro=='admin' else set(PERMS)
                     by='Вы' if ro=='owner' else str(x[1].get('name',''))[:40]
                     r=act(str(b.get('a','')),b,ro,P,by);db.commit();return s.send(200,r)
                 if ro=='owner' and p=='/api/mockpay' and MOCK:
@@ -920,15 +974,19 @@ class H(BaseHTTPRequestHandler):
                     c=str(b.get('client',''));adm=c.startswith('adm:')
                     a=ID.fullmatch(c[4:] if adm else c) and row(c[4:] if adm else c)
                     if adm and (ro!='owner' or not a or a[0]!='admin'):return s.send(403,{})
-                    if not adm and ((ro=='admin' and 'clients' not in x[1].get('perms',[])) or not a or a[0]!='client'):return s.send(403,{})
+                    if not adm and ((ro=='admin' and 'client_access' not in admin_permissions(x[1].get('perms') or [])) or not a or a[0]!='client'):return s.send(403,{})
+                    actor='Вы' if ro=='owner' else str(x[1].get('name',''))[:40]
+                    audit_id=c[4:] if adm else c
+                    target={'name':a[1].get('name',''),'target':'admin' if adm else 'client'}
                     if p=='/api/invite':
                         if not botname():return s.send(500,{'err':'Бот недоступен'})
                         q=bool(b.get('qr'));k=('qq'+secrets.token_hex(12)) if q else secrets.token_urlsafe(9)
-                        db.execute('insert into inv values(?,?,?)',(k,c,t+(600 if q else 7*86400)));db.commit()
+                        db.execute('insert into inv values(?,?,?)',(k,c,t+(600 if q else 7*86400)))
+                        write_log('invite',actor,audit_id,new={**target,'method':'qr' if q else 'link'});db.commit()
                         return s.send(200,{'tok':k,'bot':BOT[0]})
                     if adm:a[1]['tg']=None;save(c[4:],'admin',a[1])
                     else:db.execute('delete from bind where client=?',(c,))
-                    db.commit();return s.send(200,{})
+                    write_log('unbind',actor,audit_id,new=target);db.commit();return s.send(200,{})
                 if ro=='new' and p=='/api/claim':
                     TRY[u]=[q for q in TRY.get(u,[]) if q>t-3600]
                     if len(TRY[u])>=5:return s.send(429,{})
@@ -938,13 +996,15 @@ class H(BaseHTTPRequestHandler):
                     if tgt and tgt.startswith('adm:'):
                         a=row(tgt[4:]);c=a and a[0]=='admin' and not a[1].get('disabled') and a[1]
                         if c and (isq or (ph and digits(c.get('phone'))==ph)):
-                            c['tg']=u;c['tgu']=UN.get(u,'');save(tgt[4:],'admin',c);db.execute('delete from inv where tok=?',(str(b.get('tok')),));db.commit()
+                            c['tg']=u;c['tgu']=UN.get(u,'');save(tgt[4:],'admin',c);db.execute('delete from inv where tok=?',(tk,))
+                            write_log('login',c.get('name',''),tgt[4:],new={'name':c.get('name',''),'target':'admin','method':'qr' if isq else 'link'});db.commit()
                             say(f"Администратор {c.get('name')} вошёл в приложение аренды.");return s.send(200,{})
                     else:
                         c=tgt and doc(tgt)
                         if c and (isq or (ph and digits(c.get('phone'))==ph)):
                             c['tgu']=UN.get(u,'');save(tgt,'client',c)
-                            db.execute('insert or replace into bind values(?,?)',(u,tgt));db.execute('delete from inv where tok=?',(str(b.get('tok')),));db.commit()
+                            db.execute('insert or replace into bind values(?,?)',(u,tgt));db.execute('delete from inv where tok=?',(tk,))
+                            write_log('login','клиент',tgt,new={'name':c.get('name',''),'target':'client','method':'qr' if isq else 'link'});db.commit()
                             say(f"Клиент {c.get('name')} вошёл в приложение аренды.");return s.send(200,{})
                     if len(TRY[u])==3:say(f'Неудачные попытки входа (Telegram ID {u}).')
                     return s.send(403,{})
@@ -1013,7 +1073,7 @@ def migrate():
                 p=a.get('perms') or []
                 if 'pay' in p:p=p+[x for x in('partial','bill') if x not in p]
                 if 'defer' in p and 'pen' not in p:p=p+['pen']
-                a['perms']=[x for x in PERMS if x in p];a['m2']=1;save(i,'admin',a)
+                a['perms']=admin_permissions(p);a['m2']=1;save(i,'admin',a)
         c=doc('cfg')
         if c is not None and 'grace' not in c:c['grace']=2;c['pen']=5;save('cfg','cfg',c)
         db.commit()
