@@ -307,6 +307,41 @@ def addpay(r,n,amt,pe,method,by,qr=None,ts=None,kind=None,term=None,discount_inf
 def active_of(field,val):
     for i,r in kind('rent'):
         if r.get('status')=='active' and r.get(field)==val:return i,r
+def receipt_forecast(on=None,days=30):
+    """Поступления по базовому графику активных аренд, без будущей неустойки и новых выдач."""
+    on=on or today();end=on+dt.timedelta(days=days-1)
+    rows=[];overdue=0;closed_debt=0;skipped=0
+    for rid,r in kind('rent'):
+        if r.get('status')!='active':
+            closed_debt+=r.get('debt',0);continue
+        if r.get('waiting'):continue
+        client_name=(doc(r.get('client')) or {}).get('name') or 'Удалённый клиент'
+        bike=doc(r.get('bike')) or {};bike_name=' · '.join(x for x in (bike.get('num'),bike.get('name')) if x)
+        def append(date,amount,category):
+            if amount>0:rows.append({'rent':rid,'client':client_name,'bike':bike_name,'date':str(date),'amt':round(amount,2),'kind':category})
+        try:
+            k=paidn(r)+1;start=pstart(r,k);discount=pending_discount(r).get('amt',0)
+            past=[x for x in owed(r,on) if day(x['pay'])<on]
+            if past:
+                overdue+=sum(x['price']+x['pen'] for x in past)-min(discount,past[0]['price'])
+                discount=0
+            planned=(r.get('return_request') or {}).get('date')
+            planned=day(planned) if planned else None
+            for _ in range(400):
+                term,price=plan(r,k);due=due_of(r,k,start)
+                if due>end or (planned and start>planned):break
+                applied=min(discount,price);discount=0;amount=round(price-applied,2)
+                if due>=on:append(due,amount,'rent')
+                start+=dt.timedelta(days=TERM_DAYS[term]);k+=1
+            for debt in r.get('dl') or []:
+                due=day(debt['due']);amount=debt['amt']+debt.get('pen',0)
+                if due<on:overdue+=amount+daccr(r,debt,on)
+                elif due<=end:append(due,amount,'debt')
+        except (Bad,KeyError,ValueError,TypeError,OverflowError):skipped+=1
+    rows.sort(key=lambda x:(x['date'],x['client'],x['rent']))
+    seven=on+dt.timedelta(days=6)
+    return {'from':str(on),'to':str(end),'rows':rows,'total7':round(sum(x['amt'] for x in rows if x['date']<=str(seven)),2),
+            'total30':round(sum(x['amt'] for x in rows),2),'overdue':round(overdue,2),'closed_debt':round(closed_debt,2),'skipped':skipped}
 # ---------- Точка (СБП) ----------
 # Подключение: в Настройках вписываются JWT-токен, ID торговой точки (merchantId) и ID счёта (accountId).
 # Запросы сделаны по открытому API Точки (раздел СБП); при подключении сверяем с актуальной документацией.
@@ -429,7 +464,12 @@ def snapshot(ro,P):
     c.update(contact_data(c))
     c['tochka']={'on':bool(tq()),'merchant':tc.get('merchant',''),'account':tc.get('account',''),'jwt':bool(tc.get('jwt')),'hook':tc.get('hook','')} if ro=='owner' else {'on':bool(tq())}
     if not fin:c={x:c[x] for x in('week','month','renewal_rates','pen','grace','ddays','cdef','cats','tochka')}
-    return {'docs':out,'cfg':c,'today':str(t)}
+    result={'docs':out,'cfg':c,'today':str(t)}
+    if fin:result['forecast']=receipt_forecast(t)
+    if ro=='owner':
+        reminder=backup_status()
+        result.update(backup={'ts':reminder['last']} if reminder['last'] else None,backup_reminder=reminder)
+    return result
 def mine(cid):
     c=doc(cid) or {};a=active_of('client',cid);cf=cfg()
     r=None
@@ -906,8 +946,25 @@ def bget():
     try:return json.load(open(BS))
     except Exception:return None
 def bset():
-    try:open(BS,'w').write(json.dumps({'ts':now().isoformat()}))
+    try:
+        with L:
+            with open(BS+'.tmp','w') as file:json.dump({'ts':now().isoformat()},file)
+            os.replace(BS+'.tmp',BS)
     except Exception as e:print('bset',e)
+def backup_status(on=None):
+    current=on or now()
+    if current.tzinfo is None:current=current.replace(tzinfo=MSK)
+    try:
+        saved=bget()
+        if not isinstance(saved,dict):raise ValueError
+        last=dt.datetime.fromisoformat(saved['ts'])
+        if last.tzinfo is None:last=last.replace(tzinfo=MSK)
+        last=last.astimezone(MSK)
+        if last>current:raise ValueError
+        following=last+dt.timedelta(days=3)
+        return {'due':current>=following,'last':last.isoformat(),'next':following.isoformat(),'interval_days':3}
+    except (ValueError,TypeError,KeyError):
+        return {'due':True,'last':None,'next':None,'interval_days':3}
 def snap(pre):
     b=sqlite3.connect(f'{BK}/{pre}-{now():%Y-%m-%d-%H%M%S}.db');db.backup(b);b.close()
     for f in sorted(x for x in os.listdir(BK) if x.startswith(pre+'-'))[:-(30 if pre=='app' else 5)]:os.remove(f'{BK}/{f}')
@@ -969,7 +1026,10 @@ class H(BaseHTTPRequestHandler):
                 elif p=='/api/log':
                     if ro!='owner':return s.send(403,{})
                     r=[list(q) for q in db.execute('select ts,act,id,old,new from log order by rowid desc limit 300')]
-                elif ro=='owner':r={'role':'owner','backup':bget(),'empty':not db.execute("select 1 from docs where kind in('rent','bike','client') limit 1").fetchone()}
+                elif ro=='owner':
+                    reminder=backup_status()
+                    r={'role':'owner','backup':{'ts':reminder['last']} if reminder['last'] else None,'backup_reminder':reminder,
+                       'empty':not db.execute("select 1 from docs where kind in('rent','bike','client') limit 1").fetchone()}
                 elif ro=='admin':r={'role':'admin','name':x[1].get('name',''),'perms':admin_permissions(x[1].get('perms') or [])}
                 elif ro=='client':
                     c=doc(x);un=UN.get(u,'')
@@ -1000,8 +1060,9 @@ class H(BaseHTTPRequestHandler):
             ip=('dl',s.ip());t=time.time();FAIL[ip]=[x for x in FAIL.get(ip,[]) if x>t-600]
             for a in [a for a,e in DL.items() if e<t]:DL.pop(a,None)
             if len(FAIL[ip])>=10 or DL.get(p[4:],0)<t:FAIL[ip].append(t);return s.send(404,b'')
-            d=dump();bset()
-            return s.send(200,d,'application/octet-stream',{'Content-Disposition':f'attachment; filename="arenda-{now():%Y-%m-%d-%H%M}.json"','Cache-Control':'no-store'})
+            d=dump()
+            s.send(200,d,'application/octet-stream',{'Content-Disposition':f'attachment; filename="arenda-{now():%Y-%m-%d-%H%M}.json"','Cache-Control':'no-store'})
+            bset();return
         f={'/':'index.html'}.get(p)
         if not f:return s.send(404,b'')
         s.send(200,open(os.path.join(os.path.dirname(os.path.abspath(__file__)),'static',f),'rb').read(),'text/html; charset=utf-8',{'Cache-Control':'no-cache'})
