@@ -225,7 +225,7 @@ label.btn{cursor:pointer}
 <script>
 const T=(window.Telegram&&Telegram.WebApp)||{};
 try{T.ready();T.expand()}catch(e){}
-const $=s=>document.querySelector(s),v=s=>$(s).value,m=n=>Math.round(n).toLocaleString('ru')+'\u00A0₽',fmt=d=>d.split('-').reverse().join('.');
+const $=s=>document.querySelector(s),v=s=>$(s).value,m=n=>Number(n).toLocaleString('ru',{maximumFractionDigits:2})+'\u00A0₽',fmt=d=>d.split('-').reverse().join('.');
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const tx2=t=>esc(t).replace(/\n/g,'<br>');
 const ic=(n,c='')=>`<svg class="ic ${c}" aria-hidden="true"><use href="#i-${n}"/></svg>`;
@@ -245,7 +245,7 @@ function sheet(html,wire,cancel){return new Promise(res=>{const o=document.creat
 const done=x=>{o.classList.remove('on');setTimeout(()=>o.remove(),240);res(x)};o.addEventListener('click',e=>{if(e.target===o)done(cancel)});wire(o,done)})}
 const uiAlert=(t,title)=>sheet(`${title?`<h3>${esc(title)}</h3>`:''}<p>${tx2(t)}</p><button class="btn blk" data-y>Понятно</button>`,(o,d)=>o.querySelector('[data-y]').onclick=()=>d(),undefined);
 const uiConfirm=(t,yes,o={})=>sheet(`${o.title?`<h3>${esc(o.title)}</h3>`:''}<p>${tx2(t)}</p><button class="btn blk ${o.danger?'dng':''}" data-y>${esc(yes||'Да')}</button><button class="btn sec blk" data-n>Отмена</button>`,(el,d)=>{el.querySelector('[data-y]').onclick=()=>d(true);el.querySelector('[data-n]').onclick=()=>d(false)},false);
-const uiPrompt=(t,v0)=>sheet(`<p>${tx2(t)}</p><input type=number inputmode=numeric value="${esc(v0)}"><button class="btn blk" data-y>Готово</button><button class="btn sec blk" data-n>Отмена</button>`,(o,d)=>{o.querySelector('[data-y]').onclick=()=>d(o.querySelector('input').value);o.querySelector('[data-n]').onclick=()=>d(null)},null);
+const uiPrompt=(t,v0)=>sheet(`<p>${tx2(t)}</p><input type=number step=0.01 inputmode=decimal value="${esc(v0)}"><button class="btn blk" data-y>Готово</button><button class="btn sec blk" data-n>Отмена</button>`,(o,d)=>{o.querySelector('[data-y]').onclick=()=>d(o.querySelector('input').value);o.querySelector('[data-n]').onclick=()=>d(null)},null);
 const uiPick=(t,L)=>sheet(`<h3>${esc(t)}</h3>${L.map((x,i)=>`<button class=opt data-i=${i}>${esc(x)}</button>`).join('')}<button class="btn sec blk" data-n>Отмена</button>`,(o,d)=>{o.querySelectorAll('[data-i]').forEach(b=>b.onclick=()=>d(L[+b.dataset.i]));o.querySelector('[data-n]').onclick=()=>d(null)},null);
 let tt;function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('on');clearTimeout(tt);tt=setTimeout(()=>e.classList.remove('on'),2200)}
 /* ---------- api */
@@ -309,7 +309,8 @@ async function act(a,b={}){return api('/api/act',{a,...b})}
 async function load(){
     S=await api('/api/all');
     if(ME?.role=='admin'&&S.perms)ME.perms=S.perms;
-    if(isOwner()&&'backup_reminder' in S){ME.backup=S.backup;ME.backup_reminder=S.backup_reminder}
+    if(isOwner()&&'backup_reminder' in S){ME.backup=S.backup;ME.backup_reminder=S.backup_reminder;ME.empty=!['rent','bike','client'].some(k=>Object.keys(S.docs[k]||{}).length)}
+    if(ME?.role=='admin'&&Array.isArray(S.perms))ME.perms=S.perms;
     lastLoad=Date.now()
 }
 async function reload(){await load();render(true)}
@@ -318,7 +319,17 @@ function go(s,a){V.push([s,a]);navDir='fw';render()}
 const back=()=>{if(V.length>1){V.pop();navDir='bw'}render()};
 function chrome(){try{const n=ME&&ME.role=='client'?1:V.length;n>1?T.BackButton.show():T.BackButton.hide()}catch(e){}}
 try{T.BackButton.onClick(()=>{if(document.querySelector('.ov'))return;back()})}catch(e){}
-document.addEventListener('visibilitychange',async()=>{if(document.visibilityState=='visible'&&S&&Date.now()-lastLoad>30000&&!document.querySelector('.ov')){try{await load();render(true)}catch(e){}}});
+document.addEventListener('visibilitychange',async()=>{
+    if(document.visibilityState!='visible'||Date.now()-lastLoad<=30000||document.querySelector('.ov'))return;
+    try{
+        if(S){await load();render(true)}
+        else if(ME?.role=='client'){
+            const fresh=await api('/api/me');
+            if(fresh.role!='client'){location.reload();return}
+            ME=fresh;lastLoad=Date.now();cui();
+        }
+    }catch(e){}
+});
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState=='visible')refreshBackupStatus()});
 window.addEventListener('focus',()=>refreshBackupStatus());
 function navUI(){const R=V[0][0],it=[['today','home','Сегодня'],['park','bike','Парк']];
@@ -335,11 +346,11 @@ const bk=()=>`<button class=back onclick="back()">${ic('left','s')}Назад</b
 const empty=(t,i='box')=>`<div class=empty>${ic(i)}<div>${esc(t)}</div></div>`;
 const kv=(k,v)=>`<div class=kv><span>${esc(k)}</span><b>${v}</b></div>`;
 /* ---------- строка аренды */
-const LATE=s=>Math.max(s.late||0,s.dlate||0),TOT=s=>(s.debt||0)+(s.dl||0),PEN=s=>(s.pen||0)+(s.dpen||0);
+const LATE=s=>Math.max(s.late||0,s.dlate||0),TOT=s=>(s.rent_due??s.debt??0)+(s.dl||0),PEN=s=>(s.pen||0)+(s.dpen||0);
 function rentRow(r,plain){const s=r.st,c=G('client',r.client)||{};let rt,sub,tone='t-bl';const L=LATE(s),pe=PEN(s);
 if(r.waiting){sub=`${bnum(r.bike)} · с ${dd(r.waiting)}`;rt=chip('Ждёт возврата','t-bl')}
 else if(L>0){tone=pe?'t-er':'t-wa';rt=`<b style="color:var(--${pe?'ert':'wat'})">${m(TOT(s))}</b>${chip(L+' '+dayWord(L),pe?'t-er':'t-wa')}`;
-sub=`${bnum(r.bike)}${s.late==0?' · долг':''} · ${s.nopen?'без неустойки':s.defer?'отсрочка до '+dd(s.defer):pe?'неустойка '+m(pe):'неустойка с '+dd(s.late>0?s.pfrom:s.dpfrom)}`}
+sub=`${bnum(r.bike)}${s.late==0?' · долг':''} · ${pe?'неустойка '+m(pe):s.nopen?'начисление на паузе':s.defer?'отсрочка до '+dd(s.defer):'неустойка с '+dd(s.late>0?s.pfrom:s.dpfrom)}`}
 else if(s.dl>0&&!plain){tone='t-wa';rt=`<b>${m(s.dl)}</b>${chip('до '+dd(s.ddue),'t-wa')}`;sub=`${bnum(r.bike)} · долг · след. оплата ${dd(s.next)}`}
 else{rt=`<b>${m(s.nprice)}</b>${chip(rel(s.left),s.left==0?'t-wa':s.left==1?'t-bl':'t-n')}`;sub=`${bnum(r.bike)} · ${TY[s.ntype]} · оплата ${dd(s.next)}`;if(s.left==0)tone='t-wa';if(s.defer)sub+=' · отсрочка';if(s.dl>0)sub+=' · есть долг'}
 return `<button class=row onclick="go('rent','${r.id}')"><span class="av ${tone}">${esc(ini(c.name))}</span><span class=tx><b>${esc(c.name||'—')}</b><span>${esc(sub)}</span></span><span class=rt>${rt}</span></button>`}
@@ -348,12 +359,13 @@ function today(){const act_=K('rent').filter(r=>r.status=='active'),waiting=act_
 late=ongoing.filter(r=>LATE(r.st)>0).sort((a,b)=>LATE(b.st)-LATE(a.st)),
 debtors=ongoing.filter(r=>!LATE(r.st)&&r.st.dl>0).sort((a,b)=>a.st.ddue.localeCompare(b.st.ddue)),
 soon=ongoing.filter(r=>!LATE(r.st)).sort((a,b)=>a.st.left-b.st.left||a.st.nprice-b.st.nprice),
-req=K('req').filter(q=>q.status=='pending'),unk=K('unk').filter(u=>u.status=='open'),
-bikes=K('bike').filter(b=>!['sold','off'].includes(b.status)),dueT=soon.filter(r=>r.st.left==0).reduce((a,r)=>a+r.st.nprice,0)+late.reduce((a,r)=>a+TOT(r.st),0)+debtors.filter(r=>r.st.ddue==TODAY()).reduce((a,r)=>a+r.st.dl,0);
+req=K('req').filter(q=>q.status=='pending'&&ongoing.some(r=>r.id==q.rent)),unk=K('unk').filter(u=>u.status=='open'),
+bikes=K('bike').filter(b=>!['sold','off'].includes(b.status)),
+dueT=ongoing.reduce((total,{st})=>total+(st.due_total??((st.left<=0?st.debt||st.nprice:0)+(st.ddue&&st.ddue<=TODAY()?st.dl||0:0))),0);
 let h=`<div class=hd2><h1>Сегодня</h1><span>${esc(dlong(TODAY()))}</span><i></i></div>`;
 h+=backupReminderPanel();
 if(ME.empty&&isOwner())h+=`<div class="note t-bl">${ic('down')}<div><b>База пока пустая.</b><br>Загрузите файл переноса из старого сервиса — велосипеды, клиенты, аренды и платежи появятся сразу.<br><button class="btn sm" onclick="nav('more');setTimeout(()=>go('backup'),0)">Загрузить файл</button></div></div>`;
-h+=`<div class=stt style="grid-template-columns:repeat(3,1fr)"><div><b>${act_.length}/${bikes.length}</b><span>в аренде</span></div><div><b>${late.length}</b><span>просрочено</span></div><div><b>${m(dueT)}</b><span>ждём сегодня</span></div></div>`;
+h+=`<div class=stt style="grid-template-columns:repeat(3,1fr)"><div><b>${act_.length}/${bikes.length}</b><span>в аренде</span></div><div><b>${late.length}</b><span>просрочено</span></div><div><b>${m(dueT)}</b><span>к оплате сегодня</span></div></div>`;
 if(debtors.length)h+=`<h2 class=sec>Должники <span class=bdg style="background:var(--wa)">${debtors.length}</span></h2><div class=grp>${debtors.map(rentRow).join('')}</div>`;
 if(late.length)h+=`<h2 class="sec t-er">Просрочено <span class=bdg>${late.length}</span></h2><div class=grp>${late.map(rentRow).join('')}</div>`;
 if(waiting.length)h+=`<h2 class=sec>Ждут возврата <span class=bdg>${waiting.length}</span></h2><div class=grp>${waiting.map(rentRow).join('')}</div>`;
@@ -374,8 +386,8 @@ if(on&&!waiting){
     if(can('bill')&&!bills.length)payment.push(['send','Выставить платёж клиенту',()=>billS(id)]);
     for(const bill of bills){
         const amount=money2(bill.amt);
-        if(can('pay_accept'))payment.push(['check','Отметить оплату счёта · '+amount,()=>billPaid(id,bill.id)]);
-        if(can('pay_qr')&&S.cfg.tochka.on)payment.push(['qr','QR на выставленный платёж · '+amount,()=>billQR(id,bill.id)]);
+        if(can('pay_accept')&&!bill.stale)payment.push(['check','Отметить оплату счёта · '+amount,()=>billPaid(id,bill.id)]);
+        if(can('pay_qr')&&S.cfg.tochka.on&&!bill.stale)payment.push(['qr','QR на выставленный платёж · '+amount,()=>billQR(id,bill.id)]);
         if(can('bill'))payment.push(['x','Отменить выставленный платёж · '+amount,()=>billVoid(id,bill.id)]);
     }
     if(can('rent_rates'))conditions.push(['sliders','Цены продления',()=>rateS(id)]);
@@ -409,12 +421,12 @@ let h=bk()+`<div class=dh><div>${waiting?chip('Ждёт возврата','t-bl'
 <h1 onclick="go('client','${r.client}')" style="cursor:pointer">${esc(c.name||'—')}</h1><div class=mu>${esc(bfull(r.bike))}${r.contract?' · договор №'+esc(r.contract):''}</div></div>`;
 if(waiting)h+=`<div class="card t-bl"><b>Ждём велосипед с ${dshort(waiting)}</b><div class=sm>Начисления остановлены. После возврата завершите аренду.</div></div>`;
 else if(on){const dfr=s.defer?` · отсрочка до ${dshort(s.defer)}`:'';
-if(s.late>0)h+=`<div class="card ${s.pen?'t-er':'t-wa'}"><div class=sm>Просрочка ${s.late} ${dayWord(s.late)} · оплата была ${dshort(s.next)}</div><div class=big>${m(s.debt)}</div><div class=sm>${s.due_n>1?`за ${s.due_n} ${plural(s.due_n,'период','периода','периодов')}, `:''}${s.nopen?'неустойка отключена':s.pen?`в том числе неустойка ${m(s.pen)}`:`неустойка начнётся ${dshort(s.pfrom)}`}${dfr}</div></div>`;
+if(s.late>0)h+=`<div class="card ${s.pen?'t-er':'t-wa'}"><div class=sm>Просрочка ${s.late} ${dayWord(s.late)} · оплата была ${dshort(s.next)}</div><div class=big>${m(s.rent_due??s.debt)}</div><div class=sm>${s.due_n>1?`за ${s.due_n} ${plural(s.due_n,'период','периода','периодов')}, `:''}${s.pen?`в том числе неустойка ${m(s.pen)}`:s.nopen?'новая неустойка не начисляется':`неустойка начнётся ${dshort(s.pfrom)}`}${dfr}</div></div>`;
 else if(s.firstterm)h+=`<div class="card tint"><div class=sm>Первый срок · ${termLabel(s.firstterm)}</div><div class=big>${money2(s.nprice)}</div><div class=sm>Оплатить до ${dshort(s.next)}${dfr}</div></div>`;
 else h+=`<div class="card ${s.left==0?'t-wa':'tint'}"><div class=sm>${s.left==0?'Оплата сегодня — последний оплаченный день':`Следующая оплата ${rel(s.left)}, ${dshort(s.next)}`}</div><div class=big>${m(s.nprice)}</div><div class=sm>за ${TYA[s.ntype]} · оплачено по ${dshort(s.until)}${s.nopen?' · без неустойки':''}${dfr}</div></div>`;
 if(s.dl>0){const dl=s.dlate>0;h+=`<div class="card ${dl?(s.dpen?'t-er':'t-wa'):'t-wa'}"><div class=sm>${dl?`Долг просрочен на ${s.dlate} ${dayWord(s.dlate)} · срок был ${dshort(s.ddue)}`:`Долг · доплатить до ${dshort(s.ddue)} (${rel(diff(s.ddue,TODAY()))})`}</div><div class=big>${m(s.dl)}</div><div class=sm>${s.dpen?`в том числе неустойка ${m(s.dpen)}`:dl&&!s.nopen?`неустойка начнётся ${dshort(s.dpfrom)}`:'остаток после частичной оплаты'}</div></div>`}
 const BL=K('bill').filter(x=>x.rent==id&&x.status=='open');
-for(const x of BL)h+=`<div class="card t-bl"><div class=sm>Выставлен платёж ${x.kind=='debt'?'в счёт долга':'за период'}${x.due?` · если не хватит — доплатить до ${dshort(x.due)}`:''}</div><div class=big>${m(x.amt)}</div><div class=sm>клиент видит его у себя в приложении${S.cfg.tochka.on?' и может оплатить по QR':''}</div>
+for(const x of BL)h+=`<div class="card t-bl"><div class=sm>Выставлен платёж ${x.kind=='debt'?'в счёт долга':'за период'}${x.due?` · если не хватит — доплатить до ${dshort(x.due)}`:''}</div><div class=big>${m(x.amt)}</div><div class=sm>${x.stale?'Условия изменились. Отмените этот счёт и выставьте новый.':('Клиент видит счёт в приложении'+(S.cfg.tochka.on?' и может оплатить по QR':''))}</div>
 </div>`;
 }else h+=`<div class=card>${kv('Закрыта',fmt(r.closed||''))}${r.debt?kv('Долг клиента',`<span style="color:var(--ert)">${m(r.debt)}</span>`):''}${r.refund?kv('Возвращено клиенту',m(r.refund.amt)):''}${r.writeoff?kv('Списано при изъятии',m(r.writeoff)):''}</div>`;
 const primary=[];
@@ -432,13 +444,19 @@ ${on?kv('Неустойка',s.nopen?'отключена':`${S.cfg.pen}% в де
 if(r.note||can('rent_note'))h+=`<div class=card><div class=rent-note-heading><span class="sm mu">Внутренняя заметка</span>${can('rent_note')?`<button class="btn sm sec" onclick="rentNoteS('${id}')" aria-label="${r.note?'Изменить':'Добавить'} заметку по аренде">${r.note?'Изменить':'Добавить'}</button>`:''}</div>${r.note?`<div class=sm style="margin-top:8px">${tx2(r.note)}</div>`:''}</div>`;
 const P=(r.pays||[]).map((p,i)=>({...p,i})).reverse();
 h+=`<details class="fold rent-pays"><summary class=card><span>${ic('right','s')}Платежи</span><b class=mu>${P.length}</b></summary>`+
-(P.length?`<div class=grp>${P.map(p=>`<div class="row nl" style="cursor:default;min-height:58px"><span class=tx><b>${money2(p.amt)}</b><span>${fmt(p.ts.slice(0,10))} · ${MT[p.method]||p.method}${p.kind=='part'?' · частично за период':p.term?' · '+termLabel(p.term):p.n?` · ${p.n} ${plural(p.n,'период','периода','периодов')}`:p.kind=='debt'?' · в счёт долга':''}${p.discount?` · скидка ${money2(p.discount)}`:''}${p.pen?` · неустойка ${money2(p.pen)}`:''}${p.by?' · '+esc(WHO(p.by)):''}</span></span>${can('pay_delete')&&(isOwner()||['cash','transfer'].includes(p.method))&&!p.old&&on&&!waiting?`<button class="btn sm sec" onclick="payDel('${id}',${p.i})">${ic('trash','s')}</button>`:''}</div>`).join('')}</div>`:`<div class=grp>${empty('Платежей ещё нет','receipt')}</div>`)+'</details>';
+(P.length?`<div class=grp>${P.map(p=>`<div class="row nl" style="cursor:default;min-height:58px"><span class=tx><b>${money2(p.amt)}</b><span>${fmt(p.ts.slice(0,10))} · ${MT[p.method]||p.method}${p.kind=='part'?' · частично за период':p.term?' · '+termLabel(p.term):p.n?` · ${p.n} ${plural(p.n,'период','периода','периодов')}`:p.kind=='debt'?' · в счёт долга':''}${p.discount?` · скидка ${money2(p.discount)}`:''}${p.pen?` · неустойка ${money2(p.pen)}`:''}${p.by?' · '+esc(WHO(p.by)):''}</span></span>${can('pay_delete')&&(isOwner()||['cash','transfer'].includes(p.method))&&!p.qr&&!p.old&&p.i==(r.pays||[]).length-1&&on&&!waiting?`<button class="btn sm sec" onclick="payDel('${id}',${p.i})">${ic('trash','s')}</button>`:''}</div>`).join('')}</div>`:`<div class=grp>${empty('Платежей ещё нет','receipt')}</div>`)+'</details>';
 if((r.defer||[]).length)h+=`<h2 class=sec>Отсрочки</h2><div class=grp>${r.defer.slice().reverse().map(x=>`<div class="row nl" style="cursor:default;min-height:54px"><span class=tx><b>до ${fmt(x.until)}</b><span>с ${fmt(x.from)} · ${esc(WHO(x.by||''))}${x.req?' · по заявке клиента':''}</span></span></div>`).join('')}</div>`;
 return h+paymentDisciplinePanel([r])}
 const V_=id=>(G('rent',id)||{})._v;
 async function nopenS(id){const r=G('rent',id),on=!r.st.nopen;if(!await uiConfirm(on?'Неустойка этому клиенту начисляться не будет, пока вы её не вернёте. Уже начисленная остаётся — её можно списать отдельно.':'При просрочке неустойка снова будет начисляться.',on?'Отключить':'Вернуть',{title:on?'Без неустойки':'Вернуть неустойку'}))return;doAct('nopen',{id,on,v:V_(id)},on?'Неустойка отключена':'Неустойка снова начисляется').catch(()=>{})}
 async function waiveS(id){const r=G('rent',id);if(!await uiConfirm(`Списать ${m(PEN(r.st))}? Если просрочка продолжится, со следующего дня неустойка снова начнёт начисляться.`,'Списать',{title:'Списать неустойку'}))return;doAct('waive',{id,v:V_(id)},'Неустойка списана').catch(()=>{})}
-async function doAct(a,b,msg){try{const r=await act(a,b);hap('success');if(msg)toast(msg);await reload();return r}catch(e){hap('error');uiAlert(String(e));throw ABORT}}
+async function doAct(a,b,msg){
+    let result;
+    try{result=await act(a,b)}catch(e){hap('error');uiAlert(String(e));throw ABORT}
+    hap('success');if(msg)toast(msg);
+    try{await reload()}catch(e){uiAlert('Изменение сохранено. Обновите приложение, чтобы увидеть его.')}
+    return result;
+}
 function seg(name,opts,cur){return `<div class="seg in" data-seg="${name}">${opts.map(([k,t])=>`<button type=button data-v="${k}" class="${k==cur?'on':''}">${esc(t)}</button>`).join('')}</div>`}
 function wireSeg(o,cb){o.querySelectorAll('[data-seg]').forEach(g=>g.querySelectorAll('button').forEach(b=>b.onclick=()=>{g.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x==b));g.dataset.val=b.dataset.v;cb&&cb()}))}
 const segv=(o,n)=>{const g=o.querySelector(`[data-seg="${n}"]`);return g.dataset.val||(g.querySelector('.on')||{}).dataset.v};
@@ -458,8 +476,8 @@ if(!modes.length)return;
 const initial=can('pay_accept')&&s.dl>0&&!s.late?'d':modes[0][0];
 await sheet(`<h3>Принять оплату</h3><p>${esc(cname(r.client))} · ${esc(bnum(r.bike))}</p>${modes.length>1?seg('md',modes,initial):''}
 <div data-m=p><div class=fld><span>Период оплаты</span>${paymentOptions(s,Object.keys(r.rates||{}))}</div></div>
-<div data-m=x style="display:none"><label class=fld><span>Сколько внёс клиент, ₽</span><input id=pa type=number inputmode=numeric></label><label class=fld><span>Остаток доплатить до</span><input id=pd type=date value="${addD(TODAY(),S.cfg.ddays||3)}" min="${TODAY()}"></label></div>
-<div data-m=d style="display:none"><label class=fld><span>Сумма в счёт долга, ₽</span><input id=da type=number inputmode=numeric value="${s.dl||''}"></label></div>
+<div data-m=x style="display:none"><label class=fld><span>Сколько внёс клиент, ₽</span><input id=pa type=number step=0.01 inputmode=decimal></label><label class=fld><span>Остаток доплатить до</span><input id=pd type=date value="${addD(TODAY(),S.cfg.ddays||3)}" min="${TODAY()}"></label></div>
+<div data-m=d style="display:none"><label class=fld><span>Сумма в счёт долга, ₽</span><input id=da type=number step=0.01 inputmode=decimal value="${s.dl||''}"></label></div>
 <label class=fld><span>Способ</span>${seg('m',[['cash','Наличные'],['transfer','Перевод']],'cash')}</label>
 <div class=pv><div class=sm id=qh>К оплате</div><div class=big id=qa>…</div><div class=sm id=qd></div></div>
 <button class="btn blk lg" data-y disabled>Оплата получена</button><button class="btn sec blk" data-n>Отмена</button>`,(o,d)=>{let seq=0,shown;const Y=o.querySelector('[data-y]'),md=()=>o.querySelector('[data-seg=md]')?segv(o,'md'):initial;
@@ -471,12 +489,12 @@ else{const a=+o.querySelector('#pa').value||0;o.querySelector('#qh').textContent
 catch(e){if(req==seq){o.querySelector('#qa').textContent='—';o.querySelector('#qd').textContent=e}}};
 wireSeg(o,upd);upd();['#pa','#pd','#da'].forEach(k=>o.querySelector(k).oninput=upd);o.querySelector('[data-n]').onclick=()=>d();
 Y.onclick=async()=>{Y.disabled=true;const M=md(),mt=segv(o,'m');try{
-if(M=='p')await doAct('pay',{id,...selectedPeriod(o),expected:shown.amt,method:mt,v:r._v},'Оплата записана');
-else if(M=='x')await doAct('paypart',{id,amt:+o.querySelector('#pa').value,due:o.querySelector('#pd').value,method:mt,v:V_(id)},'Частичная оплата записана');
-else await doAct('paydl',{id,amt:+o.querySelector('#da').value,method:mt,v:V_(id)},'Долг уменьшен');d()}catch(e){d()}}})}
+if(M=='p')await doAct('pay',{id,...selectedPeriod(o),expected:shown.amt,expected_quote:shown.stamp,method:mt,v:r._v},'Оплата записана');
+else if(M=='x')await doAct('paypart',{id,amt:+o.querySelector('#pa').value,due:o.querySelector('#pd').value,expected:shown.amt,expected_quote:shown.stamp,method:mt,v:r._v},'Частичная оплата записана');
+else await doAct('paydl',{id,amt:+o.querySelector('#da').value,method:mt,v:r._v},'Долг уменьшен');d()}catch(e){d()}}})}
 async function billS(id){const r=G('rent',id),s=r.st,ks=[['period','За период']];if(s.dl>0)ks.push(['debt','В счёт долга']);let full=null;
 await sheet(`<h3>Выставить платёж</h3><p>Клиент увидит его у себя в приложении${S.cfg.tochka.on?' и сможет оплатить по QR — оплата отметится сама':'. Когда он заплатит, нажмите «Оплачено»'}.</p>${ks.length>1?seg('k',ks,'period'):''}
-<label class=fld><span>Сумма, ₽</span><input id=ba type=number inputmode=numeric></label>
+<label class=fld><span>Сумма, ₽</span><input id=ba type=number step=0.01 inputmode=decimal></label>
 <div id=bdw><label class=fld><span>Если сумма меньше платежа — остаток доплатить до</span><input id=bd type=date value="${addD(TODAY(),S.cfg.ddays||3)}" min="${TODAY()}"></label></div>
 <div class=pv><div class=sm id=bh></div></div><button class="btn blk lg" data-y>Выставить</button><button class="btn sec blk" data-n>Отмена</button>`,(o,d)=>{
 const K_=()=>o.querySelector('[data-seg=k]')?segv(o,'k'):'period',A_=o.querySelector('#ba');
@@ -489,7 +507,7 @@ async function billPaid(id,bid){const x=await uiPick('Как клиент опл
 async function billVoid(id,bid){if(await uiConfirm('Клиент больше не увидит этот платёж.','Отменить платёж',{danger:true}))doAct('billvoid',{id,bill:bid,v:V_(id)},'Платёж отменён').catch(()=>{})}
 async function billQR(id,bid){let q;try{q=await act('qr',{id,bill:bid,v:V_(id)})}catch(e){return uiAlert(e)}await showQR(q.qr,cname(G('rent',id).client));await reload()}
 async function payDebt(id){const r=G('rent',id);if(!await uiConfirm(`Отметить, что клиент погасил долг ${m(r.debt)}?`,'Долг погашен'))return;await doAct('paydebt',{id,v:V_(id)},'Долг погашен').catch(()=>{})}
-async function payDel(id,k){if(!await uiConfirm('Удалить этот платёж? Оплаченные периоды уменьшатся.','Удалить',{danger:true}))return;await doAct('paydel',{id,k,v:V_(id)},'Платёж удалён').catch(()=>{})}
+async function payDel(id,k){if(!await uiConfirm('Удалить последний платёж? Его сумма и оплаченный срок будут отменены, остаток долга и разовая скидка восстановятся, если они изменились при оплате.','Удалить',{danger:true}))return;await doAct('paydel',{id,k,v:V_(id)},'Платёж удалён').catch(()=>{})}
 async function qrS(id,debt){if(!S.cfg.tochka.on)return uiAlert('Чтобы выставлять QR, подключите Точку: Ещё → Настройки → Оплата по QR. Пока оплату можно отметить вручную.','QR не подключён');
 const r=G('rent',id),title=`${cname(r.client)} · ${bnum(r.bike)}`;
 if(!debt&&(r.rates||r.st.firstterm))return qrPeriodS(r.st,Object.keys(r.rates||{}),(a,b)=>act(a,{id,...b,v:r._v}),async q=>{await showQR(q,title);await reload()},()=>qrS(id,true));
@@ -504,12 +522,12 @@ if(T.downloadFile&&T.isVersionAtLeast&&T.isVersionAtLeast('8.0')){T.downloadFile
 try{const blob=await (await fetch(png)).blob(),file=new File([blob],'qr-oplata.png',{type:'image/png'});if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file]});return}}catch(e){}
 (T.openLink?T.openLink(url):open(url));uiAlert('Картинка откроется в браузере. Нажмите на неё и удерживайте, затем выберите «Сохранить в Фото».')}catch(e){uiAlert('Не удалось сохранить картинку: '+e)}}
 async function showQR(qid,title,client){let q;try{q=await api('/api/qr/'+qid)}catch(e){return uiAlert(e)}
-if(q.status!='open')return uiAlert(q.status=='paid'?'Оплата уже получена':'QR больше не действует');
+if(q.status!='open')return uiAlert(q.result=='review'?'Деньги поступили. Платёж проверяется.':q.status=='paid'?'Оплата уже получена':'QR больше не действует');
 let timer;
 await sheet(`<h3>${client?'Оплата по QR':'QR на оплату'}${client?QB('qrhow'):''}</h3><p>${esc(title||'')}</p><div class=pv style="text-align:center"><div class=big>${money2(q.amt)}</div><div class=sm>${q.pen?'в том числе неустойка '+money2(q.pen)+' · ':''}действует до конца дня</div>
-<div style="margin:14px 0 0">${q.img?`<img src="data:image/png;base64,${esc(q.img)}" alt="QR" style="width:230px;height:230px;margin:0 auto;display:block;border-radius:16px;background:#fff">`:QR.svg(q.payload,230)}</div></div>
+<div data-code style="margin:14px 0 0">${q.img?`<img src="data:image/png;base64,${esc(q.img)}" alt="QR" style="width:230px;height:230px;margin:0 auto;display:block;border-radius:16px;background:#fff">`:QR.svg(q.payload,230)}</div></div>
 <div id=qs class="note t-bl" style="margin:10px 0">${ic('clock','s')}<div>Ждём оплату…</div></div>
-<a class="btn blk lg" href="${esc(q.payload)}" target=_blank>${ic('link','s')}Открыть в приложении банка</a>
+<a class="btn blk lg" href="${esc(q.payload)}" target=_blank rel=noopener>${ic('link','s')}Открыть в приложении банка</a>
 <button class="btn sec blk" data-g>${ic('down','s')}Сохранить QR в галерею</button>
 ${client?`<div class=card style="margin:14px 0 6px;padding:16px 18px"><b>Если банк не открылся</b><ol style="margin:8px 0 0;padding-left:20px;line-height:1.5">
 <li>Нажмите «Сохранить QR в галерею».</li><li>Откройте приложение своего банка (или его сайт).</li><li>Выберите «Оплата по QR» или «Сканировать», затем «Из галереи», и выберите сохранённую картинку.</li><li>Подтвердите оплату — через пару минут она сама отметится здесь.</li></ol>
@@ -518,7 +536,18 @@ ${client?`<div class=card style="margin:14px 0 6px;padding:16px 18px"><b>Есл�
 o.querySelector('[data-x]').onclick=()=>d();o.querySelector('[data-g]').onclick=()=>saveQR(q.payload,q.amt);
 const s=o.querySelector('[data-s]');if(s)s.onclick=()=>T.openTelegramLink('https://t.me/share/url?url='+encodeURIComponent(q.payload)+'&text='+encodeURIComponent('Оплата аренды: '+m(q.amt)));
 const c=o.querySelector('[data-c]');if(c)c.onclick=async()=>{try{await navigator.clipboard.writeText(q.payload);toast('Ссылка скопирована')}catch(e){}};
-const poll=async()=>{try{const x=await api('/api/qr/'+qid);if(x.status=='paid'){hap('success');o.querySelector('#qs').className='note t-ok';o.querySelector('#qs').innerHTML=ic('check','s')+'<div><b>Оплачено</b></div>';clearInterval(timer)}else if(x.status!='open'){o.querySelector('#qs').className='note t-n';o.querySelector('#qs').innerHTML='<div>QR больше не действует</div>';clearInterval(timer)}}catch(e){}};
+const poll=async()=>{
+    try{
+        const x=await api('/api/qr/'+qid);
+        if(x.status=='open')return;
+        for(const button of o.querySelectorAll('[data-code],a[href],[data-g],[data-s],[data-c]'))button.style.display='none';
+        const status=o.querySelector('#qs'),paid=x.status=='paid'&&x.result!='review';
+        if(paid)hap('success');
+        status.className='note '+(paid?'t-ok':x.result=='review'?'t-wa':'t-n');
+        status.textContent=paid?'Оплачено':x.result=='review'?'Деньги поступили. Платёж проверяется.':'QR больше не действует';
+        clearInterval(timer);
+    }catch(e){}
+};
 timer=setInterval(()=>{if(!document.body.contains(o)){clearInterval(timer);return}poll()},5000)},null);clearInterval(timer)}
 async function deferS(id){const r=G('rent',id),def=addD(r.st.late>0?TODAY():r.st.next,3);
 await sheet(`<h3>Отсрочка без неустойки</h3><p>Пока отсрочка действует, неустойка не начисляется. Следующий период не сдвигается.</p>
@@ -577,7 +606,7 @@ const y=o.querySelector('[data-y]'),refund=o.querySelector('#rf'),debt=o.querySe
 y.onclick=async()=>{if(!refund.reportValidity()||!debt.reportValidity())return;y.disabled=true;
 try{await doAct('return',{id,refund:refund.value,debt:debt.value,v:r._v},'Аренда завершена');d()}catch(e){y.disabled=false}}})}
 async function seizeS(id){const r=G('rent',id),s=r.st;
-await sheet(`<h3>Изъять велосипед?</h3><p>Аренда закроется, <b>все долги и неустойка клиента обнулятся</b>${s.debt?` (сейчас ${m(s.debt)})`:''}. Сумма попадёт в отчёт как недополученная. Отменить нельзя.</p>
+await sheet(`<h3>Изъять велосипед?</h3><p>Аренда закроется, <b>все долги и неустойка клиента обнулятся</b>${s.debt?` (сейчас ${m(s.rent_due??s.debt)})`:''}. Сумма попадёт в отчёт как недополученная. Отменить нельзя.</p>
 <label class=fld><span>Для подтверждения напишите ИЗЪЯТЬ</span><input id=cf autocomplete=off></label>
 <button class="btn dng blk lg" data-y>Изъять</button><button class="btn sec blk" data-n>Отмена</button>`,(o,d)=>{o.querySelector('[data-n]').onclick=()=>d();
 o.querySelector('[data-y]').onclick=()=>{const c=o.querySelector('#cf').value.trim().toUpperCase();if(c!='ИЗЪЯТЬ')return toast('Напишите ИЗЪЯТЬ');doAct('seize',{id,confirm:c,v:V_(id)},'Велосипед изъят').finally(()=>d()).catch(()=>{})}})}
@@ -612,9 +641,11 @@ ${rateFields(IS.rates,true,true)}
 <button class="btn blk lg" onclick="doIssue(this)">${ic('check','s')}Выдать</button></div>`}
 function issueSummary(draft){
 const days=LEN[draft.term],date=draft.date||TODAY(),start=addD(date,draft.free?1:0),end=addD(start,days-1);
-const rate=Number(draft.first||draft.rates[draft.term]),paid=draft.pay!='no';
-return `<div class=sm>К оплате за первый срок</div><div class=big>${rate>=1?money2(rate):'—'}</div>
-${rate>=1?kv('В пересчёте на неделю',money2(rate*7/days)):''}
+const gross=Number(draft.first||draft.rates[draft.term]),paid=draft.pay!='no';
+const discount=Math.min(gross,G('client',draft.client)?.discount?.amt||0),rate=moneyRound(gross-discount);
+return `<div class=sm>К оплате за первый срок</div><div class=big>${gross>=1?money2(rate):'—'}</div>
+${discount>0?kv('Разовая скидка',money2(discount)):''}
+${gross>=1?kv('В пересчёте на неделю',money2(rate*7/days)):''}
 ${kv('Первый срок',`${fmt(start)} – ${fmt(end)}`)}
 ${kv(paid?'Оплачено по':'Оплатить до',fmt(paid?end:date))}`;
 }
@@ -654,6 +685,8 @@ try{
         IS.client=data.client;
         isUpd();
     }
+    const initial=Number(data.first||data.rates[data.term]);
+    if(data.method!='no')data.expected=moneyRound(initial-Math.min(initial,cc?.discount?.amt||0));
     const r=await act('issue',data);
     hap('success');for(const k in IS)delete IS[k];await load();V=[['today'],['rent',r.id]];navDir='fw';render();toast('Велосипед выдан')
 }catch(e){if(e?.open){await load();V=[['more'],['client',e.open]];render()}else if(e!==ABORT)uiAlert(String(e))}
@@ -663,6 +696,7 @@ finally{el.disabled=false}
 function util(b,from,to){const own=[b.bought&&b.bought>from?b.bought:from,b.gone&&b.gone<to?b.gone:to];if(own[1]<own[0])return null;const tot=diff(own[1],own[0])+1;let busy=new Set();
 for(const r of K('rent').filter(r=>r.bike==b.id)){const a=(r.issued||r.start)>own[0]?(r.issued||r.start):own[0],z=(r.status=='active'?TODAY():(r.closed||r.issued))<own[1]?(r.status=='active'?TODAY():(r.closed||r.issued)):own[1];for(let d=a;d<=z;d=addD(d,1))busy.add(d)}
 return Math.round(busy.size/tot*100)}
+const loadingPercent=value=>value==null?'—':value+'%';
 function park(){const all=K('bike'),live=all.filter(b=>!['sold','off'].includes(b.status)),cnt=k=>live.filter(b=>bstat(b)==k).length,t=TODAY(),f30=addD(t,-29);
 let L=PF=='all'?live:PF=='arch'?all.filter(b=>['sold','off'].includes(b.status)):live.filter(b=>bstat(b)==PF);L.sort((a,b)=>(a.num||'').localeCompare(b.num||'','ru',{numeric:true}));
 if(PF=='arch')return hd('Архив велосипедов',`${L.length} в архиве`)+`<div class=seg>${[['all','Все'],['free','Свободны'],['rent','В аренде'],['repair','Ремонт'],['arch','Архив']].map(([k,n])=>`<button class="${PF==k?'on':''}" onclick="PF='${k}';render()">${n}</button>`).join('')}</div>`+archivedBikes(L);
@@ -676,24 +710,71 @@ const rows=list.slice().sort((a,b)=>(b.gone||'').localeCompare(a.gone||'')).map(
 const summary=fin()?`<div class=card>${kv('Продано велосипедов',String(list.filter(b=>b.status=='sold').length))}${kv('Получено от продаж',money2(list.reduce((s,b)=>s+(b.sale?.amt||0),0)))}${kv('Прибыль за всё время',money2(rows.reduce((s,{p})=>s+p.stats.net,0)))}</div>`:'';
 return summary+`<div class=grp>${rows.map(({b,p})=>`<button class="row nl" onclick="go('bike','${b.id}')"><span class=tx><b>${esc((b.num?b.num+' · ':'')+b.name)}</b><span>${BS[b.status][0]}${b.gone?' · '+fmt(b.gone):''}${b.sale&&fin()?' · '+money2(b.sale.amt):''}</span>${p?`<span>Прибыль: ${money2(p.stats.net)}</span><span>${p.percent==null?'Укажите закупочную цену':p.balance>=0?'Сверх вложений '+money2(p.balance):'До окупаемости '+money2(-p.balance)}</span>`:''}</span><span class=rt>${p?`<b>${p.percent==null?'—':p.percent.toLocaleString('ru')+'%'}</b>`:ic('right','s')}</span></button>`).join('')}</div>`;
 }
-function sbpCharges(sbp){
-const cf=S.cfg,charge=(sum,rate)=>Math.round(sum*(rate||0));
-const total=sbp.reduce((sum,amt)=>sum+amt,0);
-const perPayment=rate=>sbp.reduce((sum,amt)=>sum+charge(amt,rate),0)/100;
-const tax=charge(total,cf.tax)/100,acq=perPayment(cf.acq),receipt=perPayment(cf.receipt);
-return {qr:total,tax,acq,receipt,commissions:Math.round((tax+acq+receipt)*100)/100}
+const cents=amount=>Math.round(Number(amount)*100);
+const moneyRound=amount=>cents(amount)/100;
+const moneySum=amounts=>amounts.reduce((sum,amount)=>sum+cents(amount),0)/100;
+function sbpCharges(payments){
+    const rates=S.cfg,fees={tax:0,acq:0,receipt:0},legacy=new Map();
+    let total=0;
+    for(const payment of payments){
+        const amount=cents(payment.amt);
+        total+=amount;
+        if(payment.fees){
+            for(const key of Object.keys(fees))fees[key]+=cents(payment.fees[key]);
+        }else{
+            const operation=payment.qr||payment;
+            legacy.set(operation,(legacy.get(operation)||0)+amount);
+        }
+    }
+    for(const amount of legacy.values()){
+        for(const key of Object.keys(fees)){
+            const rate=Math.round((rates[key]||0)*100);
+            fees[key]+=Math.round(amount*rate/10000);
+        }
+    }
+    return {qr:total/100,tax:fees.tax/100,acq:fees.acq/100,receipt:fees.receipt/100,
+            commissions:(fees.tax+fees.acq+fees.receipt)/100};
 }
-function bstats(b,from,to){const inP=d=>(!from||d>=from)&&(!to||d<=to);let inc=0,ref=0;const sbp=[];
-for(const r of K('rent').filter(r=>r.bike==b.id)){for(const p of r.pays||[])if(inP(p.ts.slice(0,10))){inc+=p.amt;if(p.method=='qr')sbp.push(p.amt)}if(r.refund&&inP(r.refund.date))ref+=r.refund.amt}
-const ex=K('exp').filter(e=>e.bike==b.id&&inP(e.date)).reduce((a,e)=>a+e.amt,0),sale=b.sale&&inP(b.sale.date)?b.sale.amt:0;
-const charges=sbpCharges(sbp);
-return {inc,ref,ex,...charges,sale,net:inc+sale-ref-charges.commissions-ex}}
+function financialDates(from,to){
+    const until=to&&to<TODAY()?to:TODAY();
+    return date=>typeof date=='string'&&date<=until&&(!from||date>=from);
+}
+function rentCash(rents,inPeriod){
+    let cash=0,transfer=0,ref=0,wo=0,inc=0;
+    const sbp=[],pays=[];
+    for(const rent of rents){
+        for(const payment of rent.pays||[]){
+            const date=payment.ts.slice(0,10);
+            if(!inPeriod(date))continue;
+            const amount=cents(payment.amt);
+            inc+=amount;
+            if(payment.method=='qr')sbp.push(payment);
+            else if(payment.method=='cash')cash+=amount;
+            else if(payment.method=='transfer')transfer+=amount;
+            pays.push({d:date,a:payment.amt});
+        }
+        if(rent.refund&&inPeriod(rent.refund.date)){
+            ref+=cents(rent.refund.amt);
+            pays.push({d:rent.refund.date,a:-rent.refund.amt});
+        }
+        if(rent.writeoff&&inPeriod(rent.closed))wo+=cents(rent.writeoff);
+    }
+    return {inc:inc/100,cash:cash/100,transfer:transfer/100,ref:ref/100,wo:wo/100,pays,...sbpCharges(sbp)};
+}
+function bstats(b,from,to){
+    const inPeriod=financialDates(from,to);
+    const received=rentCash(K('rent').filter(r=>r.bike==b.id),inPeriod);
+    const ex=moneySum(K('exp').filter(e=>e.bike==b.id&&inPeriod(e.date)).map(e=>e.amt));
+    const sale=b.sale&&inPeriod(b.sale.date)?b.sale.amt:0;
+    const {inc,ref,commissions}=received;
+    return {...received,ex,sale,net:moneySum([inc,sale,-ref,-commissions,-ex])};
+}
 function bikePayback(b){
-const stats=bstats(b),round=amount=>Math.round(amount*100)/100;
-const invested=round((b.cost||0)+stats.ex+stats.commissions);
-const received=round(stats.inc-stats.ref+stats.sale);
-const balance=round(received-invested);
-const percent=b.cost>0&&invested>0?Math.floor(received/invested*10000)/100:null;
+const stats=bstats(b);
+const invested=moneySum([b.cost||0,stats.ex,stats.commissions]);
+const received=moneySum([stats.inc,-stats.ref,stats.sale]);
+const balance=moneySum([received,-invested]);
+const percent=b.cost>0&&invested>0?Math.floor(cents(received)*10000/cents(invested))/100:null;
 return {stats,invested,received,balance,percent}
 }
 function bike(id){const b=G('bike',id);if(!b)return bk()+empty('Не найден');const s=bstat(b),r=b.rent&&G('rent',b.rent),t=TODAY();
@@ -704,7 +785,7 @@ h+=`<div class=card><div class=sm>Окупаемость за всё время<
 <div class=sm>${pb==null?'Укажите закупочную цену':payback.balance>=0?`Окупился, сверх вложений ${money2(payback.balance)}`:`До окупаемости осталось ${money2(-payback.balance)}`}</div>
 ${kv('Всего вложено',money2(payback.invested))}${kv('Поступления за всё время',money2(payback.received))}
 <div class="sm mu" style="margin-top:8px">Вложения — закупка, расходы на велосипед и комиссии (налоги, эквайринг, чеки). Поступления — аренда и продажа с вычетом возвратов клиентам.</div></div>
-<div class=card>${kv('Закупка',b.cost?m(b.cost):'—')}${kv('Куплен',b.bought?fmt(b.bought):'—')}${kv('Получено за аренду',m(a.inc))}${a.ref?kv('Возвраты клиентам','−'+m(a.ref)):''}${kv('Комиссии','−'+money2(a.commissions))}${kv('Расходы на велосипед','−'+m(a.ex))}${kv('Чистая прибыль',m(a.net))}${a.sale?kv('Продан за',m(a.sale)):''}${kv('Загрузка за 30 дней',(util(b,addD(t,-29),t)??'—')+'%')}${kv('Загрузка за всё время',(util(b,b.bought||'2000-01-01',t)??'—')+'%')}</div>`}
+<div class=card>${kv('Закупка',b.cost?m(b.cost):'—')}${kv('Куплен',b.bought?fmt(b.bought):'—')}${kv('Получено за аренду',m(a.inc))}${a.ref?kv('Возвраты клиентам','−'+m(a.ref)):''}${kv('Комиссии','−'+money2(a.commissions))}${kv('Расходы на велосипед','−'+m(a.ex))}${kv('Прибыль от аренды и продажи',m(a.net))}${kv('Результат с учётом закупки',money2(payback.balance))}${a.sale?kv('Продан за',m(a.sale)):''}${kv('Загрузка за 30 дней',loadingPercent(util(b,addD(t,-29),t)))}${kv('Загрузка за всё время',loadingPercent(b.bought?util(b,b.bought,t):null))}</div>`}
 else h+=`<div class=card>${kv('Куплен',b.bought?fmt(b.bought):'—')}</div>`;
 if(b.note)h+=`<div class="card sm">${tx2(b.note)}</div>`;
 const A=[];if(can('bike_edit'))A.push(`<button class="btn sec" onclick="bikeF('${id}')">${ic('edit','s')}Изменить</button>`);if(can('bike_status'))A.push(`<button class="btn sec" onclick="bstatS('${id}')">${ic('swap','s')}Статус</button>`);if(can('exp'))A.push(`<button class="btn sec" onclick="expF(null,'${id}')">${ic('receipt','s')}Расход</button>`);
@@ -716,7 +797,7 @@ const EX=K('exp').filter(e=>e.bike==id).sort((a,b)=>b.date.localeCompare(a.date)
 if(EX.length)h+=`<h2 class=sec>Расходы</h2><div class=grp>${EX.map(expRow).join('')}</div>`;
 return h}
 async function bikeF(id){const b=id?G('bike',id):{};await sheet(`<h3>${id?'Велосипед':'Новый велосипед'}</h3><div class=f2><label class=fld><span>Номер</span><input id=bn value="${esc(b.num||'')}" placeholder="B9"></label><label class=fld><span>VIN</span><input id=bv value="${esc(b.vin||'')}"></label></div>
-<label class=fld><span>Название</span><input id=bm value="${esc(b.name||'')}"></label>${fin()?`<div class=f2><label class=fld><span>Закупка, ₽</span><input id=bc type=number inputmode=numeric value="${b.cost||''}"></label><label class=fld><span>Дата покупки</span><input id=bd type=date value="${b.bought||''}"></label></div>`:''}
+<label class=fld><span>Название</span><input id=bm value="${esc(b.name||'')}"></label>${fin()?`<div class=f2><label class=fld><span>Закупка, ₽</span><input id=bc type=number step=0.01 inputmode=decimal value="${b.cost||''}"></label><label class=fld><span>Дата покупки</span><input id=bd type=date value="${b.bought||''}"></label></div>`:''}
 <label class=fld><span>Заметка</span><textarea id=bt>${esc(b.note||'')}</textarea></label><button class="btn blk lg" data-y>Сохранить</button><button class="btn sec blk" data-n>Отмена</button>`,(o,d)=>{o.querySelector('[data-n]').onclick=()=>d();
 o.querySelector('[data-y]').onclick=async()=>{const q=s=>o.querySelector(s);try{const r=await act('bike',{id,v:b._v,num:q('#bn').value,vin:q('#bv').value,name:q('#bm').value,cost:q('#bc')?+q('#bc').value:undefined,bought:q('#bd')?q('#bd').value:undefined,note:q('#bt').value,point:b.point||''});d();await load();if(!id)go('bike',r.id);else render(true);toast('Сохранено')}catch(e){uiAlert(e)}}})}
 async function bstatS(id){const b=G('bike',id);if(b.rent)return uiAlert('Велосипед сейчас в аренде. Сначала оформите возврат.');
@@ -736,7 +817,7 @@ return bk()+hd('Клиенты',`${K('client').filter(c=>!c.arch).length}`,can('
 let QA='';
 function carch(){const A=K('client').filter(c=>c.arch&&!c.purged),L=A.filter(c=>!QA||(c.name+' '+(c.phone||'')).toLowerCase().includes(QA.toLowerCase())).sort((a,b)=>(b.arch||'').localeCompare(a.arch||''));
 return bk()+hd('Архив клиентов',`${A.length}`)+`<div class=srch>${ic('search','s')}<input id=qa placeholder="Поиск по имени или телефону" value="${esc(QA)}" oninput="QA=this.value;clearTimeout(window.qat);window.qat=setTimeout(()=>{render(true);const e=$('#qa');e.focus();e.setSelectionRange(e.value.length,e.value.length)},250)"></div>
-<div class=sub style="margin:0 22px 8px">Сюда попадают клиенты, которых вы убрали вручную, и те, у кого не было аренды ${S.cfg.archdays||30} ${dayWord(S.cfg.archdays||30)}. Их нельзя выбрать при выдаче, вход у них сброшен. Платежи и аренды сохраняются.</div>`+
+<div class=sub style="margin:0 22px 8px">Сюда попадают клиенты, которых вы убрали вручную${S.cfg.archdays>0?', и те, у кого не было аренды '+S.cfg.archdays+' '+dayWord(S.cfg.archdays):''}. Их нельзя выбрать при выдаче, вход у них сброшен. Платежи и аренды сохраняются.</div>`+
 (L.length?`<div class=grp>${L.map(c=>`<button class=row onclick="go('client','${c.id}')"><span class=av>${esc(ini(c.name))}</span><span class=tx><b>${esc(c.name)}</b><span>${esc(c.phone||'')} · в архиве с ${fmt(c.arch)}${c.archwhy=='auto'?' (авто)':''}</span></span></button>`).join('')}</div>`:`<div class=grp>${empty(A.length?'Никого не нашли':'Архив пуст','users')}</div>`)}
 async function archS(id){const c=G('client',id);if(rentOf('client',id))return uiAlert('Сначала завершите аренду клиента.');
 if(!await uiConfirm('Клиент пропадёт из списка и из выбора при выдаче. Вход в приложение у него сбросится. Аренды и платежи сохранятся. Вернуть можно из архива.','В архив',{title:'Отправить в архив?'}))return;doAct('archive',{id},'Клиент в архиве').catch(()=>{})}
@@ -806,17 +887,21 @@ function range(){const t=TODAY();if(FIN.mode=='all')return [null,null,'Всё в
 if(FIN.mode=='y'){const y=+t.slice(0,4)+FIN.off;return [`${y}-01-01`,`${y}-12-31`,String(y)]}
 const d=new Date(t.slice(0,7)+'-01T00:00:00Z');d.setUTCMonth(d.getUTCMonth()+FIN.off);const a=d.toISOString().slice(0,10);d.setUTCMonth(d.getUTCMonth()+1);d.setUTCDate(0);
 const z=d.toISOString().slice(0,10);return [a,z,`${MN[+a.slice(5,7)-1]} ${a.slice(0,4)}`]}
-function money(from,to){const inP=d=>(!from||d>=from)&&(!to||d<=to);let inc=0,cash=0,transfer=0,ref=0,wo=0;const pays=[],sbp=[];
-for(const r of K('rent')){for(const p of r.pays||[]){const d=p.ts.slice(0,10);if(inP(d)){inc+=p.amt;
-if(p.method=='qr')sbp.push(p.amt);else if(p.method=='cash')cash+=p.amt;else if(p.method=='transfer')transfer+=p.amt;
-pays.push({d,a:p.amt})}}
-if(r.refund&&inP(r.refund.date)){ref+=r.refund.amt;pays.push({d:r.refund.date,a:-r.refund.amt})}if(r.writeoff&&inP(r.closed))wo+=r.writeoff}
-const ex=K('exp').filter(e=>inP(e.date)),charges=sbpCharges(sbp);
-const expensesTotal=ex.reduce((a,e)=>a+e.amt,ref+charges.commissions);
-const buy=K('bike').filter(b=>b.bought&&inP(b.bought)).reduce((a,b)=>a+(b.cost||0),0),sales=K('bike').filter(b=>b.sale&&inP(b.sale.date)),sale=sales.reduce((a,b)=>a+b.sale.amt,0);
-for(const b of sales)pays.push({d:b.sale.date,a:b.sale.amt});
-return {inc,cash,transfer,ref,wo,...charges,ex,expensesTotal,net:inc+sale-expensesTotal,buy,sale,saleCount:sales.length,pays}}
-function bars(rows,fmtv=m){const mx=Math.max(1,...rows.map(r=>Math.abs(r[1])));return `<div class=bars>${rows.map(([l,v,on])=>`<div class=br ${on?`onclick="${on}" style="cursor:pointer"`:''}><span>${esc(l)}</span><i><u style="width:${Math.max(0,v)/mx*100}%"></u></i><b>${fmtv(v)}</b></div>`).join('')}</div>`}
+function money(from,to){
+    const inPeriod=financialDates(from,to);
+    const received=rentCash(K('rent'),inPeriod),{inc,ref,commissions,pays}=received;
+    const ex=K('exp').filter(e=>inPeriod(e.date));
+    const expensesTotal=moneySum([ref,commissions,...ex.map(e=>e.amt)]);
+    const bikes=K('bike');
+    const buy=moneySum(bikes.filter(b=>inPeriod(b.bought)||(!from&&!to&&!b.bought)).map(b=>b.cost||0));
+    const sales=bikes.filter(b=>b.sale&&inPeriod(b.sale.date));
+    const sale=moneySum(sales.map(b=>b.sale.amt));
+    for(const b of sales)pays.push({d:b.sale.date,a:b.sale.amt});
+    const review=moneySum(K('unk').filter(u=>u.status=='open'&&inPeriod(u.ts.slice(0,10))).map(u=>u.amt));
+    const net=moneySum([inc,sale,-expensesTotal]);
+    return {...received,ex,expensesTotal,net,cashflow:moneySum([net,-buy]),buy,sale,saleCount:sales.length,review};
+}
+function bars(rows,fmtv=m){const mx=Math.max(1,...rows.map(r=>Math.abs(r[1])));return `<div class=bars>${rows.map(([l,v,on])=>`<div class=br ${on?`onclick="${on}" style="cursor:pointer"`:''}><span>${esc(l)}</span><i><u style="width:${Math.abs(v)/mx*100}%;${v<0?"background:var(--er)":""}"></u></i><b>${fmtv(v)}</b></div>`).join('')}</div>`}
 function finS(){
 const tabs=[];
 if(fin())tabs.push(['stats','Статистика',statistics],['an','Аналитика',analytics]);
@@ -833,17 +918,19 @@ costs.push(...[...cats].sort((x,y)=>y[1]-x[1]));
 if(M.ref)costs.push(['Возвраты клиентам',M.ref]);
 let h=`<div class=seg>${[['m','Месяц'],['y','Год'],['all','Всё время']].map(([k,n])=>`<button class="${FIN.mode==k?'on':''}" onclick="FIN={mode:'${k}',off:0};render()">${n}</button>`).join('')}</div>`;
 if(FIN.mode!='all')h+=`<div style="display:flex;align-items:center;justify-content:space-between;margin:4px 16px"><button class=ib onclick="FIN.off--;render()">${ic('left')}</button><b style="font-size:18px">${esc(lbl)}</b><button class=ib onclick="FIN.off++;render()" ${FIN.off>=0?'disabled style="opacity:.3"':''}>${ic('right')}</button></div>`;
-h+=`<div class="card tint"><div class=sm>Чистая прибыль</div><div class=big style="color:${M.net<0?'var(--ert)':'var(--pine)'}">${m(M.net)}</div><div class=sm>после комиссий и всех расходов</div></div>
+h+=`<div class="card tint"><div class=sm>Прибыль от аренды и продаж</div><div class=big style="color:${M.net<0?'var(--ert)':'var(--pine)'}">${m(M.net)}</div><div class=sm>поступления от аренды и продажи за вычетом комиссий, возвратов и текущих расходов</div></div>
 <div class=card>${kv('Получено всего',money2(M.inc+M.sale))}${M.saleCount?kv('Продажа электро.',money2(M.sale)):''}${kv('Аренда по СБП',money2(M.qr))}${kv('Аренда переводом',money2(M.transfer))}${kv('Аренда наличными',money2(M.cash))}
 <details class="fold fin-exp"><summary class=kv><span>${ic('right','s')}Расходы</span><b>${M.expensesTotal?'−':''}${money2(M.expensesTotal)}</b></summary>
-<div class=fin-detail>${costs.map(([k,v])=>kv(k,money2(v))).join('')}</div></details>${kv('Чистая прибыль',money2(M.net))}</div>
-<div class=card>${kv('Закупка велосипедов',m(M.buy))}${M.wo?kv('Недополучено (изъятия)',m(M.wo)):''}</div>`;
+<div class=fin-detail>${costs.map(([k,v])=>kv(k,money2(v))).join('')}</div></details>${kv('Прибыль от аренды и продаж',money2(M.net))}</div>
+${M.review?`<div class=card>${kv('Поступления по СБП на проверке',money2(M.review))}<div class=sm>Войдёт в прибыль после зачёта платежей.</div></div>`:''}<div class=card>${kv('Закупка велосипедов',m(M.buy))}${kv('Результат с учётом закупки',money2(M.cashflow))}${M.wo?kv('Недополучено (изъятия)',m(M.wo)):''}</div>`;
 let rows=[];if(FIN.mode!='m'){const ys=FIN.mode=='y'?[a.slice(0,4)]:[...new Set(M.pays.map(p=>p.d.slice(0,4)))].sort();for(const y of ys)for(let k=1;k<=12;k++){const p=`${y}-${String(k).padStart(2,'0')}`;if(p>TODAY().slice(0,7))break;const v=M.pays.filter(x=>x.d.startsWith(p)).reduce((s,x)=>s+x.a,0);if(FIN.mode=='all'&&!v&&!rows.length)continue;
 const off=(+y-+TODAY().slice(0,4))*12+k-+TODAY().slice(5,7);rows.push([`${MN[k-1].slice(0,3)}${FIN.mode=='all'?' '+y.slice(2):''}`,v,`FIN={mode:'m',off:${off}};render()`])}}
-if(FIN.mode!='m')h+=`<h2 class=sec>Получено по месяцам</h2><div class=card>${rows.length?bars(rows):empty('Нет данных')}</div>`;
+if(FIN.mode!='m')h+=`<h2 class=sec>Поступления за вычетом возвратов по месяцам</h2><div class=card>${rows.length?bars(rows):empty('Нет данных')}</div>`;
 const bl=K('bike').map(b=>({b,s:bstats(b,a,z),payback:bikePayback(b)})).filter(x=>x.s.inc||x.s.ex||x.s.sale||x.s.ref||!['sold','off'].includes(x.b.status)).sort((x,y)=>(y.payback.percent??-1e9)-(x.payback.percent??-1e9));
 h+=`<h2 class=sec>Окупаемость велосипедов</h2><div class=grp>${bl.map(({b,s,payback})=>`<button class="row nl" onclick="go('bike','${b.id}')"><span class=tx><b>${esc((b.num?b.num+' · ':'')+b.name)}</b><span>прибыль ${FIN.mode=='all'?'за всё время':'за '+esc(lbl)}: ${m(s.net)}</span><span>${payback.percent==null?'Укажите закупочную цену':payback.balance>=0?'Сверх вложений '+money2(payback.balance):'До окупаемости '+money2(-payback.balance)}</span></span><span class=rt><b style="font-size:19px;${payback.percent!=null&&payback.balance>=0?'color:var(--go)':''}">${payback.percent==null?'—':payback.percent.toLocaleString('ru')+'%'}</b></span></button>`).join('')}</div>`;
-const gen=M.ex.filter(e=>!e.bike).reduce((s,e)=>s+e.amt,0);if(gen)h+=`<div class=sub>Общие расходы без привязки к велосипеду: ${m(gen)}. Они учтены в чистой прибыли выше, но не в строках велосипедов.</div>`;
+const gen=M.ex.filter(e=>!e.bike).reduce((s,e)=>s+e.amt,0);if(gen)h+=`<div class=sub>Общие расходы без привязки к велосипеду: ${m(gen)}. Они входят в общий итог.</div>`;
+const undated=K('bike').filter(b=>b.cost&&!b.bought).reduce((sum,b)=>sum+b.cost,0);
+if(undated)h+=`<div class=sub>У велосипедов на ${money2(undated)} не указана дата закупки: она учитывается в окупаемости и за всё время. Для отчётов по месяцам укажите дату покупки.</div>`;
 return h}
 function analysisDate(raw){
 const date=String(raw||'').slice(0,10);
@@ -922,13 +1009,20 @@ function analytics(){
 const today=TODAY(),currentYear=Number(today.slice(0,4)),currentMonth=Number(today.slice(5,7));
 const issued=K('rent').map(r=>({r,date:analysisDate(r.issued)||analysisDate(r.start)}))
     .filter(({date})=>date&&date<=today);
+const firstByClient=new Map();
+for(const entry of issued){
+    const key=entry.r.client||entry.r.id,previous=firstByClient.get(key);
+    if(!previous||entry.date<previous.date)firstByClient.set(key,entry);
+}
+const newClients=new Set(firstByClient.values());
 const firstYear=issued.reduce((earliest,{date})=>Math.min(earliest,Number(date.slice(0,4))),currentYear);
 const year=Math.max(firstYear,Math.min(issueChartYear??currentYear,currentYear));
 const months=MN.map(()=>({issued:0,eligible:0,renewed:0,completed:0,days:0})),sources=new Map();
-for(const {r,date} of issued){
+for(const entry of issued){
+    const {r,date}=entry;
     if(Number(date.slice(0,4))!=year)continue;
     const month=months[Number(date.slice(5,7))-1];
-    month.issued++;
+    if(newClients.has(entry))month.issued++;
     if(typeof r.renewed=='boolean'){
         month.eligible++;
         if(r.renewed)month.renewed++;
@@ -938,6 +1032,7 @@ for(const {r,date} of issued){
         month.completed++;
         month.days+=diff(end,date)+1;
     }
+    if(!newClients.has(entry))continue;
     const raw=String(S.docs.client?.[r.client]?.src||'').trim().replace(/\s+/g,' ')||'Источник не указан';
     const name=SOURCE_NAMES.get(raw.toLocaleLowerCase('ru'))||raw,key=name.toLocaleLowerCase('ru');
     if(!sources.has(key))sources.set(key,[name,0]);
@@ -959,14 +1054,14 @@ const yearOutcome=months.reduce((sum,x)=>{
 },{eligible:0,renewed:0,completed:0,days:0});
 const outcomes=months.map((x,i)=>x.eligible||x.completed?outcomeRow(MN[i],x):'').join('');
 const channels=[...sources.values()].sort(([a,n],[b,m])=>m-n||a.localeCompare(b,'ru'));
-return receiptForecast()+`<h2 class=sec>Выдачи велосипедов по месяцам</h2>
+return receiptForecast()+`<h2 class=sec>Выдачи велосипедов новым клиентам</h2>
 <div class=issue-year>
     <button class=ib aria-label="Предыдущий год" onclick="issueChartYear=${year-1};render(true)" ${year<=firstYear?'disabled':''}>${ic('left')}</button>
     <b>${year}</b>
     <button class=ib aria-label="Следующий год" onclick="issueChartYear=${year+1};render(true)" ${year>=currentYear?'disabled':''}>${ic('right')}</button>
 </div>
 <div class="card issue-chart"><ol class=issue-months aria-label="Количество выдач по месяцам за ${year} год">${chart}</ol></div>
-<div class=sub>Каждая новая аренда считается один раз по дате выдачи.${year==currentYear?` Данные по ${dshort(today)}.`:''}</div>
+<div class=sub>Считается первая выдача каждому клиенту.${year==currentYear?` Данные по ${dshort(today)}.`:''}</div>
 <h2 class=sec>Продления и средний срок</h2>
 <div class=card>${outcomes?`<table class=rental-outcomes>
     <thead><tr><th scope=col>Месяц выдачи</th><th scope=col>Продлили</th><th scope=col>Средний срок</th></tr></thead>
@@ -976,13 +1071,13 @@ return receiptForecast()+`<h2 class=sec>Выдачи велосипедов по
 ${paymentAnalytics(year)}
 <h2 class=sec>Выдачи по источникам</h2>
 <div class="card source-chart">${channels.length?bars(channels,n=>n.toLocaleString('ru')):empty('Выдач за выбранный год нет','chart')}</div>
-<div class=sub>Источник берётся из поля «Откуда пришёл» в карточке клиента.</div>`;
+<div class=sub>По первым выдачам. Источник берётся из карточки клиента.</div>`;
 }
 const expRow=e=>`<button class="row nl" onclick="expF('${e.id}')"><span class=tx><b>${esc(e.title||e.cat)}</b><span>${fmt(e.date)} · ${esc(e.cat)}${e.bike?' · '+esc(bnum(e.bike)):' · общий'}</span></span><span class=rt><b>${m(e.amt)}</b></span></button>`;
 function expenses(){const E=K('exp').sort((a,b)=>b.date.localeCompare(a.date)),G2={};for(const e of E)(G2[e.date.slice(0,7)]=G2[e.date.slice(0,7)]||[]).push(e);
 return (can('exp')?`<div class=acts><button class="btn blk" onclick="expF()">${ic('plus','s')}Добавить расход</button></div>`:'')+(E.length?Object.entries(G2).map(([k,L])=>`<h2 class=sec>${MN[+k.slice(5,7)-1]} ${k.slice(0,4)} <span class="mu sm" style="margin-left:auto;font-weight:600">${m(L.reduce((a,e)=>a+e.amt,0))}</span></h2><div class=grp>${L.map(expRow).join('')}</div>`).join(''):`<div class=grp>${empty('Расходов пока нет','receipt')}</div>`)}
 async function expF(id,bike){if(!can('exp'))return;const e=id?G('exp',id):{date:TODAY(),bike:bike||'',cat:S.cfg.cats[0]},bs=K('bike').sort((a,b)=>(a.num||'').localeCompare(b.num||'','ru',{numeric:true}));
-await sheet(`<h3>${id?'Расход':'Новый расход'}</h3><div class=f2><label class=fld><span>Сумма, ₽</span><input id=ea type=number inputmode=decimal value="${e.amt||''}"></label><label class=fld><span>Дата</span><input id=ed type=date value="${e.date}"></label></div>
+await sheet(`<h3>${id?'Расход':'Новый расход'}</h3><div class=f2><label class=fld><span>Сумма, ₽</span><input id=ea type=number inputmode=decimal value="${e.amt||''}"></label><label class=fld><span>Дата</span><input id=ed type=date max="${TODAY()}" value="${e.date}"></label></div>
 <label class=fld><span>Категория</span><select id=ec>${S.cfg.cats.concat(S.cfg.cats.includes(e.cat)?[]:[e.cat]).map(c=>`<option ${c==e.cat?'selected':''}>${esc(c)}</option>`).join('')}</select></label>
 <label class=fld><span>Электровелосипед</span><select id=eb><option value="">Общий расход (без велосипеда)</option>${bs.map(b=>`<option value="${b.id}" ${b.id==e.bike?'selected':''}>${esc((b.num?b.num+' · ':'')+b.name)}</option>`).join('')}</select></label>
 <label class=fld><span>Описание</span><input id=et value="${esc(e.title||'')}" placeholder="Например: ремонт заднего колеса"></label>
@@ -995,10 +1090,13 @@ if(unk&&can('pay_review'))it.push(['alert','Не распознанные пла
 return hd('Ещё',ME.role=='admin'?ME.name:'')+`<div class=grp>${it.map(([i,n,s,r])=>`<button class=row onclick="go('${s}')"><span class=gl>${ic(i)}</span><span class=tx><b>${n}</b></span><span class=rt><span class=mu>${r}</span></span>${ic('right','s')}</button>`).join('')}</div>`}
 function unkL(){const U=K('unk').sort((a,b)=>b.ts.localeCompare(a.ts));return bk()+hd('Не распознано')+`<div class=sub style="margin:0 22px 8px">Платежи по QR, которые не удалось засчитать автоматически: оплатили не в тот день, после изменений в аренде или повторно.</div>`+(U.length?`<div class=grp>${U.map(u=>{const r=G('rent',u.rent)||{};return `<button class=row onclick="unkS('${u.id}')"><span class="gl ${u.status=='open'?'t-er':'t-n'}">${ic(u.status=='open'?'alert':'check')}</span><span class=tx><b>${m(u.amt)}</b><span>${esc(r.client?cname(r.client):'')} · ${fmt(u.ts.slice(0,10))}${u.status!='open'?' · разобрано':''}</span></span></button>`}).join('')}</div>`:`<div class=grp>${empty('Всё разобрано','check')}</div>`)}
 async function unkS(id){const u=G('unk',id),r=G('rent',u.rent);if(u.status!='open')return uiAlert(u.status=='applied'?'Платёж засчитан в аренду.':'Отмечено как разобранное. '+(u.note||''));
-const term=G('qr',u.qr)?.term,active=r?.status=='active'&&!r.waiting;
-await sheet(`<h3>Платёж ${m(u.amt)}</h3><p>${esc(u.why||'')}. Клиент: ${esc(r?cname(r.client):'—')}.</p>${active?`<div class=fld><span>Засчитать как оплату периодов</span>${term?seg('term',TERMS,term):seg('n',[[1,'1'],[2,'2'],[3,'3']],1)}</div><button class="btn blk" data-a>Засчитать в аренду</button>`:r&&r.debt?`<button class="btn blk" data-a>Засчитать в долг</button>`:''}
+const term=G('qr',u.qr)?.term,active=r?.status=='active'&&!r.waiting,canDebt=active&&u.amt<=(r.st.dl||0);
+await sheet(`<h3>Платёж ${m(u.amt)}</h3><p>${esc(u.why||'')}. Клиент: ${esc(r?cname(r.client):'—')}.</p>${active?`<div class=fld><span>Засчитать как оплату периодов</span>${r.st.firstterm||term?paymentOptions(r.st,r.st.firstterm?[r.st.firstterm]:Object.keys(r.rates||{})):seg('n',[[1,'1'],[2,'2'],[3,'3']],1)}</div><button class="btn blk" data-a>Засчитать в аренду</button>`:r&&r.debt?`<button class="btn blk" data-a>Засчитать в долг</button>`:''}
+${canDebt?'<button class="btn sec blk" data-debt>Засчитать в счёт долга</button>':''}
 <label class=fld><span>Или отметить как разобранный (например, вернули деньги)</span><input id=un placeholder="Комментарий"></label><button class="btn sec blk" data-d>Разобрано</button><button class="btn sec blk" data-n>Отмена</button>`,(o,d)=>{wireSeg(o);o.querySelector('[data-n]').onclick=()=>d();
 const a=o.querySelector('[data-a]');if(a)a.onclick=()=>doAct('unk',{id,do:'apply',rent:u.rent,...(active?selectedPeriod(o):{})},'Засчитано').finally(()=>d()).catch(()=>{});
+const debt=o.querySelector('[data-debt]');
+if(debt)debt.onclick=()=>doAct('unk',{id,do:'debt'},'Засчитано в долг').then(()=>d()).catch(()=>{});
 o.querySelector('[data-d]').onclick=()=>doAct('unk',{id,do:'done',note:o.querySelector('#un').value},'Отмечено').finally(()=>d()).catch(()=>{})})}
 function settings(){const c=S.cfg,t=c.tochka||{};const f=(id,l,v,ty='number')=>`<label class=fld><span>${l}</span><input id=${id} type=${ty} ${ty=='number'?'inputmode=decimal':''} value="${esc(v)}"></label>`;
 return bk()+hd('Настройки')+`<div class=form><h3>Тарифы по умолчанию</h3><div id=default-rates>${rateFields(c.renewal_rates,true)}</div>
@@ -1349,7 +1447,7 @@ if(s.dl>0)h+=`<div class="cn dcard"><div class=mu>${dlate>0?`Долг — сро
 <div class=mu>${s.dpen?`в том числе неустойка ${m(s.dpen)}`:dlate>0&&!s.nopen?`<b>Неустойка начнётся ${dshort(s.dpfrom)}</b> — ${pen}% от долга за каждый день`:'остаток после частичной оплаты'}</div>
 ${ME.qr?`<div class=mu style="margin-top:6px;color:var(--ert);font-weight:650">Сначала оплатите долг</div><button class="btn dng blk" style="margin-top:12px" onclick="cDebt()">${ic('receipt','s')}Доплатить по QR</button>`:''}</div>`;
 h+=`<div class=cn>`;
-if(s.late>0){h+=`<div class=mu>К оплате за аренду${QB('late')}</div><div class=big style="color:var(--${s.pen>0?'ert':'wat'});margin-top:4px">${m(s.debt)}</div>`;
+if(s.late>0){h+=`<div class=mu>К оплате за аренду${QB('late')}</div><div class=big style="color:var(--${s.pen>0?'ert':'wat'});margin-top:4px">${m(s.rent_due??s.debt)}</div>`;
  h+=`<div class=mu>${s.pen>0?`в том числе неустойка ${m(s.pen)} — ${pen}% от платежа за каждый день просрочки`:s.nopen||s.defer?'':`<b>Неустойка начнётся ${dshort(s.pfrom)}</b> — ${pen}% от платежа за каждый день. Оплатите до этого дня, чтобы её не было.`}</div>`}
 else{h+=`<div class=mid>${s.firstterm?`Первый срок · ${termLabel(s.firstterm)}`:last?'Оплатите сегодня следующий период':`Следующая оплата ${dshort(s.next)}`}${QB('next')}</div><div class=mu>${s.firstterm?money2(s.nprice)+' · оплатить до '+dshort(s.next):R.terms?.length?'Сумма зависит от выбранного периода':`${m(s.nprice)} за ${TYA[s.ntype]}`}${last?'':' · '+rel(s.left)}${s.dl>0&&!last?` · оплачено ещё ${s.pdays} ${dayWord(s.pdays)}`:''}</div>
 `}
@@ -1379,7 +1477,7 @@ catch(e){if(req==seq){o.querySelector('#qa').textContent='—';o.querySelector('
 wireSeg(o,upd);upd();if(w)w.onchange=upd;o.querySelector('[data-n]').onclick=()=>d();
 const debtBtn=o.querySelector('[data-d]');if(debtBtn)debtBtn.onclick=()=>{d();onlyDebt()};
 y.onclick=async()=>{busy=true;y.disabled=true;
-try{const r=await call('qr',{...params(),expected:shown.amt});d();if(r.qr)await onQr(r.qr);else{toast('Скидка применена, срок оплачен');if(ME.role=='client'){ME=await api('/api/me');cui()}else await reload()}}
+try{const r=await call('qr',{...params(),expected:shown.amt,expected_quote:shown.stamp});d();if(r.qr)await onQr(r.qr);else{toast('Скидка применена, срок оплачен');if(ME.role=='client'){ME=await api('/api/me');cui()}else await reload()}}
 catch(e){uiAlert(e);busy=false;upd()}}})}
 async function cPay(){
 const R=ME.rent;
@@ -1390,7 +1488,7 @@ await sheet(`<h3>Возврат велосипеда</h3><p>Укажите пл�
 async function cReq(){const n=ME.cdef;await sheet(`<h3>Отсрочка</h3><p>Попросите перенести оплату без неустойки. Мы одобрим или отклоним заявку.</p><label class=fld><span>На сколько дней</span>${seg('d',Array.from({length:n},(_,i)=>[i+1,String(i+1)]),Math.min(2,n))}</label>
 <button class="btn blk lg" data-y>Отправить заявку</button><button class="btn sec blk" data-n>Отмена</button>`,(o,d)=>{wireSeg(o);o.querySelector('[data-n]').onclick=()=>d();
 o.querySelector('[data-y]').onclick=async()=>{try{await api('/api/c',{a:'req',days:+segv(o,'d')});d();hap('success');toast('Заявка отправлена');ME=await api('/api/me');cui()}catch(e){uiAlert(e)}}})}
-const startParam=()=>{const u=T.initDataUnsafe||{};if(u.start_param)return u.start_param;const x=(location.search+'&'+location.hash.replace(/^#/,'')).match(/tgWebAppStartParam=([^&]+)/);return x?decodeURIComponent(x[1]):''};
+const startParam=()=>{const u=T.initDataUnsafe||{};if(u.start_param)return u.start_param;const x=(location.search+'&'+location.hash.replace(/^#/,'')).match(/tgWebAppStartParam=([^&]+)/);try{return x?decodeURIComponent(x[1]):''}catch{return ''}};
 async function claim(tok){try{await api('/api/claim',{tok,phone:$('#ph').value});location.reload()}catch(e){uiAlert('Проверьте номер телефона и ссылку. Номер должен совпадать с тем, который вы указали при оформлении аренды.','Не удалось войти')}}
 /* ---------- запуск */
 const SCR={today,park,bike,rent,issue,clients,client,carch,fin:finS,more,unkL,settings,admins,backup,logS};
@@ -1399,11 +1497,11 @@ SCR.issue.after=()=>{wireSeg($('#issue-form'),isUpd);isUpd()};
 try{ME=await api('/api/me')}catch(e){$('#app').innerHTML=`<div class=center>${ic('alert','l')}<h1>Нет связи</h1><p>Не удалось связаться с сервером. Попробуйте позже.</p></div>`;return}
 if(ME.role=='owner'||ME.role=='admin'){$('#nav').style.display='';await load();render();return}
 $('#nav').style.display='none';
-if(ME.role=='client')return cui();
+if(ME.role=='client'){lastLoad=Date.now();return cui()}
 if(ME.role=='off'){$('#app').innerHTML=`<div class=center>${ic('lock','l')}<h1>Доступ отключён</h1><p>Свяжитесь с нами.</p></div>`+CBTN();return}
 const tok=startParam();
 if(/^qq[0-9a-f]{24}$/.test(tok)){$('#app').innerHTML='<div class=spin></div>';try{await api('/api/claim',{tok});location.reload()}catch(e){$('#app').innerHTML=`<div class=center>${ic('alert','l')}<h1>QR устарел</h1><p>Код действует 10 минут и срабатывает один раз. Попросите показать новый.</p></div>`}return}
-$('#app').innerHTML=tok?`<div class=center>${ic('bike','l')}<h1>Вход</h1><p>Введите номер телефона, который вы сообщили при оформлении аренды.</p><div style="text-align:left"><input id=ph type=tel inputmode=tel placeholder="+7 900 000-00-00" autocomplete=tel></div><div class=acts style="margin:16px 0"><button class="btn blk lg" onclick="claim('${esc(tok)}')">Войти</button></div></div>`:
+$('#app').innerHTML=tok?`<div class=center>${ic('bike','l')}<h1>Вход</h1><p>Введите номер телефона, который вы сообщили при оформлении аренды.</p><div style="text-align:left"><input id=ph type=tel inputmode=tel placeholder="+7 900 000-00-00" autocomplete=tel></div><div class=acts style="margin:16px 0"><button class="btn blk lg" onclick="claim(startParam())">Войти</button></div></div>`:
 `<div class=center>${ic('link','l')}<h1>Нужна ссылка</h1><p>Откройте ссылку для входа, которую вам прислали.</p></div>`+CBTN()})();
 
 </script></body></html>
