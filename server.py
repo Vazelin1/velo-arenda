@@ -1166,6 +1166,31 @@ def dump():
         return json.dumps({'v':1,'app':'rent','ts':now().isoformat(),'docs':ds,'bind':[[a,c] for a,c in db.execute('select tg,client from bind')],
             'log':log},ensure_ascii=False).encode()
 IMG={};DL={};TTL=int(os.environ.get('DL_TTL','120'));BS=DATA+'/last_download.json'
+def prune_download_links(at):
+    for token in [token for token,(expires,_) in DL.items() if expires<=at]:
+        DL.pop(token,None)
+
+def send_backup(handler,token,metadata_only=False):
+    ip=('dl',handler.ip())
+    current=time.time()
+    with L:
+        prune_download_links(current)
+        failures=FAIL[ip]=[at for at in FAIL.get(ip,[]) if at>current-600]
+        link=DL.get(token)
+        allowed=link is not None and len(failures)<10
+        if not allowed:failures.append(current)
+    if not allowed:
+        return handler.send(404,b'',x={'Cache-Control':'no-store'})
+    _,filename=link
+    headers={
+        'Content-Disposition':f'attachment; filename="{filename}"',
+        'Access-Control-Allow-Origin':'https://web.telegram.org',
+        'Access-Control-Expose-Headers':'Content-Disposition',
+        'Cache-Control':'no-store',
+    }
+    handler.send(200,dump(),'application/octet-stream',headers)
+    if not metadata_only:bset()
+
 def bget():
     try:
         with open(BS) as file:return json.load(file)
@@ -1331,7 +1356,8 @@ class H(BaseHTTPRequestHandler):
         if isinstance(b,(dict,list)):b=json.dumps(b,ensure_ascii=False).encode()
         s.send_response(c);s.send_header('Content-Type',t);s.send_header('Content-Length',str(len(b)))
         for k,v in {**HD,**(x or {})}.items():s.send_header(k,v)
-        s.end_headers();s.wfile.write(b)
+        s.end_headers()
+        if s.command!='HEAD':s.wfile.write(b)
     def ip(s):return s.headers.get('X-Forwarded-For','').split(',')[0].strip() or s.client_address[0]
     def user(s):
         ip=s.ip();t=time.time()
@@ -1385,17 +1411,15 @@ class H(BaseHTTPRequestHandler):
             x=IMG.get(p[5:])
             if not x:return s.send(404,b'')
             return s.send(200,x[1],'image/png',{'Content-Disposition':'attachment; filename="qr-oplata.png"','Cache-Control':'no-store'})
-        if p.startswith('/dl/'):
-            ip=('dl',s.ip());t=time.time();FAIL[ip]=[x for x in FAIL.get(ip,[]) if x>t-600]
-            for a in [a for a,e in DL.items() if e<t]:DL.pop(a,None)
-            if len(FAIL[ip])>=10 or DL.get(p[4:],0)<t:FAIL[ip].append(t);return s.send(404,b'')
-            d=dump()
-            s.send(200,d,'application/octet-stream',{'Content-Disposition':f'attachment; filename="arenda-{now():%Y-%m-%d-%H%M}.json"','Cache-Control':'no-store'})
-            bset();return
+        if p.startswith('/dl/'):return send_backup(s,p[4:])
         f={'/':'index.html'}.get(p)
         if not f:return s.send(404,b'')
         with open(os.path.join(os.path.dirname(os.path.abspath(__file__)),'static',f),'rb') as page:
             s.send(200,page.read(),'text/html; charset=utf-8',{'Cache-Control':'no-cache'})
+    def do_HEAD(s):
+        p=s.path.split('?')[0]
+        if p.startswith('/dl/'):return send_backup(s,p[4:],metadata_only=True)
+        return s.send(404,b'')
     def do_POST(s):
         p=s.path.split('?')[0]
         try:n=int(s.headers.get('Content-Length',0))
@@ -1426,7 +1450,12 @@ class H(BaseHTTPRequestHandler):
             if len(IMG)>200:IMG.clear()
             k=secrets.token_urlsafe(16);IMG[k]=(t+600,png);return s.send(200,{'url':'/img/'+k})
         if u==OWNER and p=='/api/dl':
-            k=secrets.token_urlsafe(16);DL[k]=t+TTL;return s.send(200,{'url':'/dl/'+k})
+            token=secrets.token_urlsafe(16)
+            filename=f'arenda-{now():%Y-%m-%d-%H%M}.json'
+            with L:
+                prune_download_links(t)
+                DL[token]=(t+TTL,filename)
+            return s.send(200,{'url':'/dl/'+token,'filename':filename,'expires_in':TTL},x={'Cache-Control':'no-store'})
         if u==OWNER and p=='/api/restore':
             c,r=restore(b);return s.send(c,{'docs':r} if c==200 else {'err':r})
         with L:
