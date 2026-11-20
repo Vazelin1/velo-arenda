@@ -1167,8 +1167,8 @@ if(!isOwner()||!reminder?.due)return '';
 return `<div class="card t-wa backup-reminder" role=status><b>Пора скачать резервную копию</b><div class=sm style="margin-top:6px">${reminder.last?'С последней выгрузки прошло не менее трёх дней.':'Вы ещё не скачивали резервную копию.'} Скачайте все данные одним файлом и сохраните его на компьютере.</div><button class="btn blk" style="margin-top:12px" onclick="downloadBackup(this)">${ic('down','s')}Скачать копию</button><div class="sm mu" style="margin-top:8px">Следующее напоминание — через три дня после выгрузки.</div></div>`;
 }
 async function refreshBackupStatus(){
-if(!isOwner())return;
-try{const previous=JSON.stringify(ME.backup_reminder),fresh=await api('/api/me');if(fresh.role!='owner')return;
+if(!isOwner()||document.querySelector('.ov'))return;
+try{const previous=JSON.stringify(ME.backup_reminder),fresh=await api('/api/me');if(fresh.role!='owner'||document.querySelector('.ov'))return;
 ME.backup=fresh.backup;ME.backup_reminder=fresh.backup_reminder;
 if(S){S.backup=fresh.backup;S.backup_reminder=fresh.backup_reminder}
 if(previous!==JSON.stringify(fresh.backup_reminder)&&['today','backup'].includes(V.at(-1)?.[0])&&!document.querySelector('.ov'))render(true)
@@ -1176,8 +1176,67 @@ if(previous!==JSON.stringify(fresh.backup_reminder)&&['today','backup'].includes
 }
 function backup(){const b=ME.backup,reminder=ME.backup_reminder;return bk()+hd('Копии и перенос')+`<div class=card><b>Скачать копию</b><div class="sm mu" style="margin:6px 0 12px">Все данные одним файлом. Сервер и так сохраняет копию каждую ночь в 03:00.${b?'<br>Последняя выгрузка: '+fmt(b.ts.slice(0,10)):''}<br>Напоминание о скачивании появляется на странице «Сегодня» раз в три дня.${reminder?.next?'<br>Следующее — '+fmt(reminder.next.slice(0,10)):''}</div><button class="btn blk" onclick="downloadBackup(this)">${ic('down','s')}Скачать копию</button></div>
 <div class=card><b>Загрузить из файла</b><div class="sm mu" style="margin:6px 0 12px">Файл переноса из старого сервиса или ранее скачанная копия. <b>Все текущие данные заменятся.</b> Перед этим сервер сохранит их в служебную копию.</div><label class="btn sec blk">${ic('up','s')}Выбрать файл<input type=file accept=".json,application/json" style="display:none" onchange="restoreFile(this)"></label></div>`}
-async function downloadBackup(el){const t=el.innerHTML;el.disabled=true;el.textContent='Готовлю…';try{const r=await api('/api/dl',{}),url=location.origin+r.url,name=`arenda-${TODAY()}.json`;
-if(T.downloadFile&&T.isVersionAtLeast&&T.isVersionAtLeast('8.0'))T.downloadFile({url,file_name:name},accepted=>{if(accepted){refreshBackupStatus();setTimeout(refreshBackupStatus,2000)}});else{T.openLink?T.openLink(url):open(url);await uiAlert('Файл откроется в браузере и сохранится в «Загрузки».');await refreshBackupStatus();setTimeout(refreshBackupStatus,2000)}}catch(e){uiAlert('Не удалось подготовить копию: '+e)}el.disabled=false;el.innerHTML=t}
+async function downloadBackup(button){
+    if(button.disabled)return;
+    const caption=button.innerHTML,preparedAt=Date.now();
+    button.disabled=true;
+    button.textContent='Готовлю…';
+    let ticket;
+    try{
+        ticket=await api('/api/dl',{});
+    }catch(error){
+        return uiAlert(error==='код 403'
+            ?'Откройте приложение заново с аккаунта владельца и повторите скачивание.'
+            :'Не удалось подготовить копию: '+error);
+    }finally{
+        button.disabled=false;
+        button.innerHTML=caption;
+    }
+
+    const url=location.origin+ticket.url;
+    const expiresAt=preparedAt+ticket.expires_in*1000;
+    const native=typeof T.downloadFile==='function'&&T.isVersionAtLeast?.('8.0');
+    const started=await sheet(`<h3>Скачать копию</h3>
+        <p>${esc(ticket.filename)}</p>
+        <a class="btn blk lg" data-browser href="${esc(url)}" target="_blank" rel="noopener noreferrer">Скачать через браузер</a>
+        ${native?'<button class="btn sec blk" data-telegram>Скачать в Telegram</button>':''}
+        <div class="sm mu" data-status role="status" style="margin-top:8px"></div>
+        <button class="btn sec blk" data-close>Закрыть</button>`,
+    (dialog,close)=>{
+        const status=dialog.querySelector('[data-status]');
+        const available=()=>{
+            if(Date.now()<expiresAt)return true;
+            status.textContent='Ссылка истекла. Закройте окно и нажмите «Скачать копию» ещё раз.';
+            return false;
+        };
+        const browser=dialog.querySelector('[data-browser]');
+        browser.onclick=event=>{
+            if(!available()){event.preventDefault();return}
+            // Этот вызов должен идти прямо из клика, чтобы браузер мог открыть новое окно.
+            if(T.openLink&&!String(T.platform||'').startsWith('web')){
+                try{T.openLink(url);event.preventDefault()}catch{}
+            }
+            close(true);
+        };
+        const telegram=dialog.querySelector('[data-telegram]');
+        if(telegram)telegram.onclick=()=>{
+            if(!available())return;
+            try{
+                T.downloadFile({url,file_name:ticket.filename},accepted=>{
+                    if(accepted)close(true);
+                    else status.textContent='Копию можно скачать через браузер.';
+                });
+            }catch{
+                status.textContent='Telegram не открыл загрузку. Скачайте копию через браузер.';
+            }
+        };
+        dialog.querySelector('[data-close]').onclick=()=>close(false);
+    },false);
+    if(started){
+        setTimeout(refreshBackupStatus,350);
+        setTimeout(refreshBackupStatus,2000);
+    }
+}
 async function restoreFile(el){const f=el.files[0];el.value='';if(!f)return;let b;try{b=JSON.parse(await f.text())}catch(e){return uiAlert('Не удалось прочитать файл.')}
 if(!b||b.v!=1||b.app!='rent'||!Array.isArray(b.docs))return uiAlert('Это не файл приложения аренды.');const n=k=>b.docs.filter(x=>x.kind==k).length;
 if(!await uiConfirm(`В файле: велосипедов ${n('bike')}, клиентов ${n('client')}, аренд ${n('rent')}, расходов ${n('exp')}.\nТекущие данные заменятся.`,'Загрузить',{danger:!ME.empty,title:'Загрузить данные?'}))return;
