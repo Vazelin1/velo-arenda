@@ -133,6 +133,7 @@ def botname():
 BOT_INFO_CITY='Санкт-Петербург'
 PRIVACY_TITLE='Политика обработки персональных данных'
 PRIVACY_PATH='/privacy'
+INFO_PATH='/info'
 PRIVACY_URL='https://rent.volt-voyaj.ru'+PRIVACY_PATH
 BOT_INFO_DEFAULTS={
     'name':'ИП Старчевский Максим Юрьевич',
@@ -181,12 +182,15 @@ def privacy_page(info):
         f'<h2>{escape(part[3:])}</h2>' if part.startswith('## ') else f'<p>{escape(part)}</p>'
         for part in privacy_paragraphs(info)
     )
+    return public_page(PRIVACY_TITLE,body)
+
+def public_page(title,body):
     return f'''<!doctype html>
 <html lang="ru">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{PRIVACY_TITLE} · Вольт Вояж</title>
+<title>{title} · Вольт Вояж</title>
 <style>
     :root {{color-scheme:light; background:#f1f2ee; color:#1f2b28; font:16px/1.6 system-ui,sans-serif}}
     body {{margin:0; padding:clamp(12px,4vw,44px)}}
@@ -196,10 +200,13 @@ def privacy_page(info):
     h1 {{font-size:clamp(1.55rem,5vw,2.3rem); line-height:1.15; margin:.35em 0 .8em}}
     h2 {{font-size:1.1rem; line-height:1.35; margin:1.45em 0 .45em}}
     p {{margin:.55em 0}}
+    nav {{display:flex; flex-wrap:wrap; gap:.4rem 1rem; margin:1.25rem 0}}
+    a {{color:#2f5d50; text-underline-offset:3px}}
+    section {{border-top:1px solid #e2e8e3; padding-bottom:.75rem}}
 </style>
 </head>
 <body>
-<main><header><p>Вольт Вояж</p><h1>{PRIVACY_TITLE}</h1></header>{body}</main>
+<main><header><p>Вольт Вояж</p><h1>{title}</h1></header>{body}</main>
 </body>
 </html>'''
 
@@ -300,6 +307,20 @@ def bot_info_screen(settings,section,username,index=0):
         actions.append([{'text':'В главное меню','callback_data':'rent_info:menu'}])
         if section!='contact':actions.append([{'text':'Связаться','callback_data':'rent_info:contact'}])
     return body,{'inline_keyboard':actions+links}
+
+def rental_info_page(settings):
+    sections=[]
+    for key in BOT_INFO_SECTIONS:
+        message,_=bot_info_screen(settings,key,None)
+        heading,_,copy=message.partition('\n\n')
+        paragraphs=''.join(f'<p>{escape(part).replace(chr(10),"<br>")}</p>' for part in copy.split('\n\n'))
+        sections.append(f'<section id="{key}"><h2>{escape(heading)}</h2>{paragraphs}</section>')
+    navigation=''.join(f'<a href="#{key}">{escape(label)}</a>' for key,label in BOT_INFO_SECTIONS.items())
+    phone=escape(bot_info_data(settings)['phone'])
+    body=(f'<p>Санкт-Петербург. Выдача и возврат по записи.</p><p><a href="tel:{phone}">Позвонить {phone}</a></p>'
+          f'<nav aria-label="Разделы">{navigation}<a href="{PRIVACY_PATH}">{PRIVACY_TITLE}</a></nav>'
+          +''.join(sections))
+    return public_page('Аренда электровелосипедов',body)
 
 def handle_bot_info(update):
     callback=update.get('callback_query')
@@ -1619,6 +1640,9 @@ class H(BaseHTTPRequestHandler):
         if p==PRIVACY_PATH:
             with L:info=bot_info_data(cfg())
             return s.send(200,privacy_page(info).encode('utf-8'),'text/html; charset=utf-8',{'Cache-Control':'no-cache'})
+        if p==INFO_PATH:
+            with L:settings=cfg()
+            return s.send(200,rental_info_page(settings).encode('utf-8'),'text/html; charset=utf-8',{'Cache-Control':'no-cache'})
         if p in('/api/all','/api/me','/api/log'):
             u=s.user()
             if u is None:return s.send(403,{})
@@ -1668,7 +1692,7 @@ class H(BaseHTTPRequestHandler):
         s.send(200,(STATIC_DIR/f).read_bytes(),'text/html; charset=utf-8',{'Cache-Control':'no-cache'})
     def do_HEAD(s):
         p=s.path.split('?')[0]
-        if p==PRIVACY_PATH:return s.do_GET()
+        if p in (PRIVACY_PATH,INFO_PATH):return s.do_GET()
         if p.startswith('/dl/'):return send_backup(s,p[4:],metadata_only=True)
         return s.send(404,b'')
     def do_POST(s):
