@@ -154,6 +154,8 @@ nav .bar{pointer-events:auto;display:flex;width:100%;max-width:520px;background:
 .spin{width:34px;height:34px;border-radius:50%;border:4px solid var(--track);border-top-color:var(--pine);animation:sp .8s linear infinite;margin:30vh auto 0}@keyframes sp{to{transform:rotate(360deg)}}
 .empty{padding:36px 28px;text-align:center;color:var(--mu)}.empty .ic{width:40px;height:40px;margin-bottom:8px;opacity:.6}
 .center{padding:48px 24px 24px;text-align:center}.center h1{margin:18px 0 8px;font-size:28px;letter-spacing:-.02em}.center p{color:var(--mu);margin:0 0 20px;line-height:1.45}
+.privacy-link{margin:16px 20px 8px;text-align:center;font-size:13px}
+.privacy-link a{color:var(--pine);text-underline-offset:3px}
 :focus-visible{outline:3px solid var(--pine);outline-offset:2px}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 .rpd{margin-top:6px}
@@ -1098,6 +1100,21 @@ const a=o.querySelector('[data-a]');if(a)a.onclick=()=>doAct('unk',{id,do:'apply
 const debt=o.querySelector('[data-debt]');
 if(debt)debt.onclick=()=>doAct('unk',{id,do:'debt'},'Засчитано в долг').then(()=>d()).catch(()=>{});
 o.querySelector('[data-d]').onclick=()=>doAct('unk',{id,do:'done',note:o.querySelector('#un').value},'Отмечено').finally(()=>d()).catch(()=>{})})}
+const BOT_INFO_FIELDS=[
+    ['name','Наименование ИП','text'],['inn','ИНН ИП','text'],['ogrnip','ОГРНИП','text'],
+    ['phone','Телефон в меню бота','tel'],['email','Рабочая почта','email'],
+    ['pickup','Место выдачи и возврата, если публикуете','text'],
+    ['privacy','Ссылка на опубликованную копию политики','url'],
+];
+function botInfoSettings(info){
+const ready=info.name&&info.inn&&info.ogrnip;
+return `<details class="fold rate-schedule" style="margin-top:18px">
+<summary><span>${ic('right','s')}Меню бота /start</span></summary>
+<div class="sm mu" style="padding:8px 0 2px">Эти сведения видит любой, кто запустил бота.</div>
+<div class="note ${ready?'t-ok':'t-wa'}" style="margin:8px 0">${ready?'Реквизиты заполнены.':'Для проверки Точкой укажите название ИП, ИНН и ОГРНИП.'}</div>
+${BOT_INFO_FIELDS.map(([field,label,type])=>`<label class=fld><span>${label}</span><input id="bot-info-${field}" type="${type}" ${['inn','ogrnip'].includes(field)?'inputmode="numeric"':''} value="${esc(info[field]||'')}"></label>`).join('')}
+</details>`;
+}
 function settings(){const c=S.cfg,t=c.tochka||{};const f=(id,l,v,ty='number')=>`<label class=fld><span>${l}</span><input id=${id} type=${ty} ${ty=='number'?'inputmode=decimal':''} value="${esc(v)}"></label>`;
 return bk()+hd('Настройки')+`<div class=form><h3>Тарифы по умолчанию</h3><div id=default-rates>${rateFields(c.renewal_rates,true)}</div>
 <h3>Неустойка и отсрочки</h3><div class=f2>${f('sp','Неустойка, % от платежа в день',c.pen)}${f('sg','Дней просрочки без неустойки',c.grace)}</div><div class=f2>${f('sd','Отсрочка по заявке клиента, макс. дней (0–3)',c.cdef)}${f('sdd','Срок доплаты долга по умолчанию, дней',c.ddays)}</div>
@@ -1108,6 +1125,7 @@ return bk()+hd('Настройки')+`<div class=form><h3>Тарифы по ум
 ${f('tm','ID торговой точки (merchantId)',t.merchant||'','text')}${f('ta','ID счёта (accountId)',t.account||'','text')}<label class=fld><span>JWT-токен из интернет-банка Точки</span><input id=tj type=password placeholder="${t.jwt?'сохранён — оставьте пустым, чтобы не менять':'вставьте токен'}"></label>
 ${t.hook?`<div class=sub style="margin:8px 4px">Адрес для вебхука в Точке: <br><b style="word-break:break-all">${esc(location.origin+'/hook/tochka/'+t.hook)}</b></div>`:''}
 <h3>Контакты для клиентов</h3>${f('scp','Телефон',c.cphone||'','tel')}${f('scm','Ссылка на чат в МАКСе',c.cmax||'','url')}${f('sct','Ссылка на чат в Telegram',c.ctg||'','url')}
+${botInfoSettings(c.bot_info||{})}
 <h3>Уведомления в Telegram</h3><div class=card style="margin:8px 0;padding:0"><label class=sw><span class=tx><b>Сообщения мне</b><span>Сводка в 10:00, заявки на отсрочку, оплаты по QR</span></span><input type=checkbox id=no ${c.nown?'checked':''}></label>
 <label class=sw><span class=tx><b>Напоминания клиентам</b><span>Накануне и в день оплаты, в 10:00</span></span><input type=checkbox id=nc ${c.ncli?'checked':''}></label></div>
 <div class=sub style="margin:0 4px">Пока сервер не может достучаться до Telegram, сообщения не доходят. Приложение от этого не зависит.</div>
@@ -1116,7 +1134,8 @@ async function saveCfg(el){
 const q=s=>$(s).value,inputs=$('#default-rates').querySelectorAll('[data-rate]');
 const invalid=[...inputs].find(input=>!input.checkValidity());
 if(invalid){invalid.reportValidity();return}
-el.disabled=true;try{await act('cfg',{renewal_rates:rateValues(inputs),pen:+q('#sp'),grace:+q('#sg'),cdef:+q('#sd'),ddays:+q('#sdd'),archdays:+q('#sar'),cphone:q('#scp'),cmax:q('#scm'),ctg:q('#sct'),tax:+q('#st'),acq:+q('#sa'),receipt:+q('#sr'),cats:q('#sc').split('\n'),nown:$('#no').checked,ncli:$('#nc').checked,tochka:{merchant:q('#tm'),account:q('#ta'),jwt:q('#tj')}});hap('success');toast('Сохранено');await reload()}catch(e){uiAlert(e)}el.disabled=false}
+const botInfo=Object.fromEntries(BOT_INFO_FIELDS.map(([field])=>[field,q('#bot-info-'+field)]));
+el.disabled=true;try{await act('cfg',{renewal_rates:rateValues(inputs),pen:+q('#sp'),grace:+q('#sg'),cdef:+q('#sd'),ddays:+q('#sdd'),archdays:+q('#sar'),cphone:q('#scp'),cmax:q('#scm'),ctg:q('#sct'),bot_info:botInfo,tax:+q('#st'),acq:+q('#sa'),receipt:+q('#sr'),cats:q('#sc').split('\n'),nown:$('#no').checked,ncli:$('#nc').checked,tochka:{merchant:q('#tm'),account:q('#ta'),jwt:q('#tj')}});hap('success');toast('Сохранено');await reload()}catch(e){uiAlert(e)}el.disabled=false}
 const ADMIN_GROUPS=[
 ['Аренда',[
     ['rent_issue','Выдавать велосипеды','Оформлять аренду и отмечать оплату при выдаче'],
@@ -1410,6 +1429,7 @@ function journalEntry([ts,tag,id,oldRaw,newRaw]){
         case 'cfg':
             logRates(details,a.renewal_rates,b.renewal_rates);
             logFields(details,['pen','grace','cdef','ddays','archdays','tax','acq','receipt','cats','cphone','ctg','cmax','nown','ncli'],a,b);
+            if(JSON.stringify(a.bot_info??{})!==JSON.stringify(b.bot_info??{}))details.push('Изменены сведения в меню бота /start');
             if(b._audit?.bank_key_changed||JSON.stringify(a.tochka??{})!==JSON.stringify(b.tochka??{}))details.push('Изменено подключение Точки');
             break;
         case 'admin': case 'admindel': {
@@ -1479,6 +1499,7 @@ function openContact(event,link){
 const open=link.hostname=='t.me'&&T.openTelegramLink?T.openTelegramLink:T.openLink;
 if(open){event.preventDefault();open.call(T,link.href)}
 }
+const privacyLink='<p class=privacy-link><a href="/privacy" target="_blank" rel="noopener noreferrer" onclick="openContact(event,this)">Политика обработки персональных данных</a></p>';
 function CBTN(){
 const phone=(ME.cphone||'').replace(/[^+0-9]/g,''),actions=[];
 if(ME.cmax)actions.push(['send','Написать в МАКС',ME.cmax,true]);
@@ -1560,7 +1581,7 @@ if(ME.role=='client'){lastLoad=Date.now();return cui()}
 if(ME.role=='off'){$('#app').innerHTML=`<div class=center>${ic('lock','l')}<h1>Доступ отключён</h1><p>Свяжитесь с нами.</p></div>`+CBTN();return}
 const tok=startParam();
 if(/^qq[0-9a-f]{24}$/.test(tok)){$('#app').innerHTML='<div class=spin></div>';try{await api('/api/claim',{tok});location.reload()}catch(e){$('#app').innerHTML=`<div class=center>${ic('alert','l')}<h1>QR устарел</h1><p>Код действует 10 минут и срабатывает один раз. Попросите показать новый.</p></div>`}return}
-$('#app').innerHTML=tok?`<div class=center>${ic('bike','l')}<h1>Вход</h1><p>Введите номер телефона, который вы сообщили при оформлении аренды.</p><div style="text-align:left"><input id=ph type=tel inputmode=tel placeholder="+7 900 000-00-00" autocomplete=tel></div><div class=acts style="margin:16px 0"><button class="btn blk lg" onclick="claim(startParam())">Войти</button></div></div>`:
+$('#app').innerHTML=tok?`<div class=center>${ic('bike','l')}<h1>Вход</h1><p>Введите номер телефона, который вы сообщили при оформлении аренды.</p><div style="text-align:left"><input id=ph type=tel inputmode=tel placeholder="+7 900 000-00-00" autocomplete=tel></div><div class=acts style="margin:16px 0"><button class="btn blk lg" onclick="claim(startParam())">Войти</button></div></div>`+privacyLink:
 `<div class=center>${ic('link','l')}<h1>Нужна ссылка</h1><p>Откройте ссылку для входа, которую вам прислали.</p></div>`+CBTN()})();
 
 </script></body></html>
