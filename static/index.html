@@ -156,6 +156,8 @@ nav .bar{pointer-events:auto;display:flex;width:100%;max-width:520px;background:
 .center{padding:48px 24px 24px;text-align:center}.center h1{margin:18px 0 8px;font-size:28px;letter-spacing:-.02em}.center p{color:var(--mu);margin:0 0 20px;line-height:1.45}
 .privacy-link{margin:16px 20px 8px;text-align:center;font-size:13px}
 .privacy-link a{color:var(--pine);text-underline-offset:3px}
+.client-requisites{margin:20px 22px 0;padding:14px 0;border-top:1px solid var(--ln);color:var(--mu);font-size:13px;line-height:1.55;overflow-wrap:anywhere}
+.client-requisites b{display:block;color:var(--ink)}
 :focus-visible{outline:3px solid var(--pine);outline-offset:2px}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 .rpd{margin-top:6px}
@@ -1515,10 +1517,19 @@ function clientPayments(R){
 return `<div class=cp><button class=tl onclick="CPO=!CPO;cui()"><span class=gl>${ic('clock')}</span><span style="flex:1">Платежи${R.pays.length?` · ${R.pays.length}`:''}</span><span style="flex:none!important;transform:rotate(${CPO?90:0}deg);transition:transform .2s;display:flex;color:var(--mu)">${ic('right','s')}</span></button></div>
 ${!CPO?'':R.pays.length?`<div class=grp style="margin-top:10px">${R.pays.slice().reverse().map(p=>`<div class="row nl" style="cursor:default;min-height:56px"><span class=tx><b>${money2(p.amt)}</b><span>${fmt(p.ts.slice(0,10))} · ${MT[p.method]||p.method}${p.kind=='part'?' · частично':p.kind=='debt'?' · в счёт долга':p.term?' · '+termLabel(p.term):''}${p.discount?` · скидка ${money2(p.discount)}`:''}${p.pen?' · неустойка '+money2(p.pen):''}</span></span></div>`).join('')}</div>`:`<div class=grp>${empty('Платежей пока нет')}</div>`}`
 }
-function cui(){const R=ME.rent;$('#nav').style.display='none';let h=`<div class=chd><small>Аренда электровелосипеда</small><b>${esc(ME.fio||ME.name||'')}</b></div>`;
+function clientFooter(){
+const info=ME.operator;
+return CBTN()+(info?`<footer class=client-requisites aria-label="Реквизиты арендодателя">
+<b>${esc(info.name)}</b>
+<div>ИНН ${esc(info.inn)}</div>
+<div>ОГРНИП ${esc(info.ogrnip)}</div>
+<div>${esc(info.city)}</div>
+</footer>`:'');
+}
+function cui(){const R=ME.rent,footer=clientFooter();$('#nav').style.display='none';let h=`<div class=chd><small>Аренда электровелосипеда</small><b>${esc(ME.fio||ME.name||'')}</b></div>`;
 if(ME.discount)h+=`<div class="note t-ok">${ic('receipt','s')}<div><b>Вам скидка ${money2(ME.discount.amt)}</b><br>На следующую оплату аренды за любой срок. Применится автоматически, максимум до стоимости аренды.</div></div>`;
-if(!R){h+=ME.debt?`<div class="cn"><div class=mu>Долг по прошлой аренде</div><div class=big style="color:var(--ert)">${m(ME.debt)}</div><div class=mu>Свяжитесь с нами для оплаты.</div></div>`:`<div class=center>${ic('bike','l')}<h1>Аренды сейчас нет</h1><p>Когда вам выдадут велосипед, здесь появятся сроки и оплата.</p></div>`;$('#app').innerHTML=h+CBTN();return}
-if(R.waiting){$('#app').innerHTML=h+`<div class="cn"><div class=mid>Ждём возврата велосипеда</div><div class=mu>Начисления остановлены с ${dshort(R.waiting)}.</div></div>`+clientPayments(R)+CBTN();return}
+if(!R){h+=ME.debt?`<div class="cn"><div class=mu>Долг по прошлой аренде</div><div class=big style="color:var(--ert)">${m(ME.debt)}</div><div class=mu>Свяжитесь с нами для оплаты.</div></div>`:`<div class=center>${ic('bike','l')}<h1>Аренды сейчас нет</h1><p>Когда вам выдадут велосипед, здесь появятся сроки и оплата.</p></div>`;$('#app').innerHTML=h+footer;return}
+if(R.waiting){$('#app').innerHTML=h+`<div class="cn"><div class=mid>Ждём возврата велосипеда</div><div class=mu>Начисления остановлены с ${dshort(R.waiting)}.</div></div>`+clientPayments(R)+footer;return}
 const s=R.st,g=ME.grace||0,pen=ME.pen,last=s.late==0&&s.left==0,dlate=s.dlate||0,L=Math.max(s.late,dlate);
 const top=L>0?[(s.pen||s.dpen||s.dl)?'t-er':'t-wa','alert',s.late>0?`Просрочка ${s.late} ${dayWord(s.late)}`:`Долг просрочен на ${dlate} ${dayWord(dlate)}`]:s.dl>0?['t-er','alert',`Долг ${m(s.dl)} — доплатите до ${dshort(s.ddue)}`]:last?['t-wa','clock',s.firstterm?'Сегодня нужно оплатить первый срок':'Сегодня последний оплаченный день']:['t-ok','check',`Оплачено ещё ${s.pdays} ${dayWord(s.pdays)}`];
 if(!(s.dl>0&&L==0))h+=`<div class="cb ${top[0]}"><span class=gl>${ic(top[1])}</span><span style="flex:1">${top[2]}</span>${QB(L>0?(s.late>0?'late':'debt'):s.dl>0?'debt':last?'next':'days')}</div>`;
@@ -1537,8 +1548,8 @@ if(!s.nopen)h+=`<div class=sub style="margin:6px 26px 0">При просрочк
 h+=`<div class=cp>${ME.qr||ME.discount?`<button class=tl onclick="cPay()"><span class=gl>${ic('receipt')}</span><span style="flex:1">${ME.qr?'Оплатить аренду по QR':'Посмотреть оплату со скидкой'}</span>${QB('qr')}${ic('right','s')}</button>`:`<div class="note t-n" style="margin:12px 0 0">${ic('receipt','s')}<div>Оплата по QR скоро появится. Пока оплачивайте так, как договорились.</div></div>`}
 ${R.req?`<div class="note t-wa" style="margin:12px 0 0">${ic('clock','s')}<div>Заявка на отсрочку ${R.req.days} ${dayWord(R.req.days)} отправлена. Ждём решения.</div></div>`:ME.cdef>0?`<button class=tl onclick="cReq()"><span class=gl>${ic('clock')}</span><span style="flex:1">Попросить отсрочку</span>${QB('defer')}${ic('right','s')}</button>`:''}</div>${clientPayments(R)}
 ${R.return_request?`<div class="cn t-bl"><b>Возврат ${fmt(R.return_request.date)}</b>${QB('returnbike')}<div class=sm>${R.return_request.ack?'Заявка просмотрена':'Заявка отправлена'}. Аренда продолжается до фактического возврата.</div>${R.return_request.note?`<div class=sm>${tx2(R.return_request.note)}</div>`:''}<button class="btn sec blk" style="margin-top:10px" onclick="cReturn()">Изменить или отменить заявку</button></div>`:`<div class=cp><button class=tl onclick="cReturn()"><span class=gl>${ic('flag')}</span><span style="flex:1">Планирую вернуть велосипед</span>${QB('returnbike')}${ic('right','s')}</button></div>`}
-${ME.debt?`<div class="note t-er">${ic('alert','s')}<div>Долг по прошлой аренде: <b>${m(ME.debt)}</b></div></div>`:''}${CBTN()}`;
-$('#app').innerHTML=h}
+${ME.debt?`<div class="note t-er">${ic('alert','s')}<div>Долг по прошлой аренде: <b>${m(ME.debt)}</b></div></div>`:''}`;
+$('#app').innerHTML=h+footer}
 async function cAfter(qid,title){await showQR(qid,title,1);ME=await api('/api/me');cui()}
 async function cBill(bid){try{const r=await api('/api/c',{a:'qr',bill:bid});await cAfter(r.qr,'Выставленный платёж')}catch(e){uiAlert(e)}}
 async function cDebt(){try{const r=await api('/api/c',{a:'qr',debtonly:1});await cAfter(r.qr,'Доплата долга')}catch(e){uiAlert(e)}}
@@ -1580,8 +1591,8 @@ $('#nav').style.display='none';
 if(ME.role=='client'){lastLoad=Date.now();return cui()}
 if(ME.role=='off'){$('#app').innerHTML=`<div class=center>${ic('lock','l')}<h1>Доступ отключён</h1><p>Свяжитесь с нами.</p></div>`+CBTN();return}
 const tok=startParam();
+if(!tok){location.replace('/info');return}
 if(/^qq[0-9a-f]{24}$/.test(tok)){$('#app').innerHTML='<div class=spin></div>';try{await api('/api/claim',{tok});location.reload()}catch(e){$('#app').innerHTML=`<div class=center>${ic('alert','l')}<h1>QR устарел</h1><p>Код действует 10 минут и срабатывает один раз. Попросите показать новый.</p></div>`}return}
-$('#app').innerHTML=tok?`<div class=center>${ic('bike','l')}<h1>Вход</h1><p>Введите номер телефона, который вы сообщили при оформлении аренды.</p><div style="text-align:left"><input id=ph type=tel inputmode=tel placeholder="+7 900 000-00-00" autocomplete=tel></div><div class=acts style="margin:16px 0"><button class="btn blk lg" onclick="claim(startParam())">Войти</button></div></div>`+privacyLink:
-`<div class=center>${ic('link','l')}<h1>Нужна ссылка</h1><p>Откройте ссылку для входа, которую вам прислали.</p></div>`+CBTN()})();
+$('#app').innerHTML=`<div class=center>${ic('bike','l')}<h1>Вход</h1><p>Введите номер телефона, который вы сообщили при оформлении аренды.</p><div style="text-align:left"><input id=ph type=tel inputmode=tel placeholder="+7 900 000-00-00" autocomplete=tel></div><div class=acts style="margin:16px 0"><button class="btn blk lg" onclick="claim(startParam())">Войти</button></div></div>`+privacyLink})();
 
 </script></body></html>
