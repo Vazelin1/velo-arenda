@@ -1,0 +1,1584 @@
+<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="color-scheme" content="light dark"><title>Аренда</title><script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>:root{--bg:#F1F2EE;--card:#fff;--fill:#EBEEE9;--ink:#1F2B28;--mu:#667470;--ln:#E2E6E0;--track:#D9DED8;--pine:#2F5D50;--on:#fff;--tint:#DDE9E3;--go:#3A8560;--nav:rgba(255,255,255,.9);
+--ok:#4E9B71;--okb:#DDEFE4;--okt:#2A6847;--wa:#D9A23A;--wab:#F8ECCB;--wat:#765210;--er:#D8695A;--erb:#F8DDD8;--ert:#8F2F24;--dr:#A8392E;--bl:#4F83B3;--blb:#DCE9F4;--blt:#2F5F8A;--nb:#E9ECE6;--nt:#5A6662;
+--sh:0 10px 32px rgba(31,43,40,.16);color-scheme:light}
+:root[data-theme=dark]{--bg:#121A18;--card:#1B2624;--fill:#25312E;--ink:#ECF1EE;--mu:#9AA8A3;--ln:#2B3733;--track:#33413D;--pine:#86C5AE;--on:#10201A;--tint:#243832;--go:#5DB48A;--nav:rgba(27,38,36,.9);
+--ok:#6BBE8E;--okb:#223A2E;--okt:#9CDDB8;--wa:#E3B34F;--wab:#3C3319;--wat:#EBCB82;--er:#E58A7C;--erb:#432622;--ert:#F2B3A9;--dr:#E27263;--bl:#7FAFDA;--blb:#223446;--blt:#A5C9EA;--nb:#2A3532;--nt:#A9B6B1;
+--sh:0 10px 32px rgba(0,0,0,.45);color-scheme:dark}
+.t-ok{--tc:var(--ok);--tb:var(--okb);--tt:var(--okt)}.t-wa{--tc:var(--wa);--tb:var(--wab);--tt:var(--wat)}.t-er{--tc:var(--er);--tb:var(--erb);--tt:var(--ert)}
+.t-dr{--tc:var(--dr);--tb:var(--erb);--tt:var(--ert)}.t-bl{--tc:var(--bl);--tb:var(--blb);--tt:var(--blt)}.t-n{--tc:var(--mu);--tb:var(--nb);--tt:var(--nt)}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 ui-rounded,"SF Pro Rounded",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-variant-numeric:tabular-nums;letter-spacing:.005em}
+button,input,select,textarea{font:inherit;color:inherit}
+#app{max-width:560px;margin:0 auto;padding-bottom:128px;min-height:100vh}
+#app.fw{animation:fw .2s ease-out}@keyframes fw{from{opacity:.0;transform:translateX(14px)}}
+#app.bw{animation:bw .2s ease-out}@keyframes bw{from{opacity:0;transform:translateX(-14px)}}
+.ic{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}.ic.s{width:20px;height:20px}.ic.l{width:30px;height:30px}
+a{color:var(--pine)}
+.mu{color:var(--mu)}.sm{font-size:13px;line-height:1.35}
+/* headings */
+.hd{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;padding:22px 20px 10px}
+.hd h1{margin:0;font-size:30px;line-height:1.1;font-weight:750;letter-spacing:-.02em}.hd small{display:block;color:var(--mu);font-size:14px;margin-bottom:4px}
+h2.sec{margin:26px 20px 8px;font-size:18px;line-height:1.2;font-weight:700;letter-spacing:-.01em;display:flex;align-items:center;gap:8px}h2.sec.t-er{color:var(--ert)}
+h3{margin:22px 4px 4px;font-size:17px;font-weight:700}
+.ib{width:46px;height:46px;border-radius:50%;border:0;background:var(--card);color:var(--ink);display:grid;place-items:center;flex:none;cursor:pointer}
+.ib:active,.row:active,.tb:active,.btn:active,.wk button:active{transform:scale(.97)}
+.back{display:flex;align-items:center;gap:6px;border:0;background:none;color:var(--pine);font-weight:650;font-size:16px;padding:18px 16px 0;min-height:48px}
+/* hero on the home screen */
+.hero{margin:6px 16px 0;background:var(--card);border-radius:28px;overflow:hidden}
+.hh{display:flex;align-items:center;gap:12px;width:100%;border:0;background:none;color:inherit;font:inherit;text-align:left;padding:18px 16px 18px 20px;cursor:pointer}.hh:active{background:var(--fill)}
+.hh .tx{flex:1;min-width:0}.hh .ht{display:block;font-size:23px;line-height:1.2;font-weight:750;letter-spacing:-.02em}.hh .hs{display:block;margin-top:4px;color:var(--mu);font-size:14px}
+.hh .chev{width:40px;height:40px;border-radius:14px;background:var(--tint);color:var(--pine);display:grid;place-items:center;flex:none;transition:transform .26s}.hero.open .hh .chev{transform:rotate(180deg)}
+.cal{display:grid;grid-template-rows:0fr;transition:grid-template-rows .26s ease}.cal>div{overflow:hidden;min-height:0;visibility:hidden;transition:visibility 0s .26s}
+.hero.open .cal{grid-template-rows:1fr}.hero.open .cal>div{visibility:visible;transition-delay:0s}
+@media (prefers-reduced-motion:reduce){.cal,.hh .chev{transition:none}}
+.wk{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;padding:0 8px 10px}
+.wk button{border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 0 8px;border-radius:16px;font-size:13px;color:var(--mu);cursor:pointer}
+.wk .n{font-size:17px;font-weight:700;color:var(--ink)}.wk .col{width:100%;max-width:24px;height:46px;display:flex;align-items:flex-end}
+.wk .col i{display:block;width:100%;border-radius:8px;background:var(--pine);min-height:6px}.wk .col i.z{background:var(--track);min-height:6px;height:6px}
+.wk .c{height:16px;font-size:12px;font-weight:700;color:var(--ink)}.wk .t{background:var(--tint)}.wk button:disabled{cursor:default}
+.stt{display:grid;grid-template-columns:repeat(2,1fr);background:var(--card);border-radius:22px;margin:4px 16px 8px}
+.stt div{padding:14px 8px 12px;text-align:center}.stt div+div{border-left:1px solid var(--ln)}.stt b{display:block;font-size:24px;line-height:1.1;font-weight:750}.stt span{font-size:13px;color:var(--mu)}
+.bdg{min-width:28px;height:28px;padding:0 8px;border-radius:14px;background:var(--dr);color:var(--on);display:inline-grid;place-items:center;font-size:15px;font-weight:750;line-height:1;flex:none}
+/* lists */
+.grp{background:var(--card);border-radius:24px;margin:6px 16px;overflow:hidden}
+.row{display:flex;align-items:center;gap:14px;padding:13px 16px;width:100%;min-height:68px;border:0;background:none;text-align:left;position:relative;cursor:pointer;color:inherit}
+.row+.row::before{content:"";position:absolute;top:0;left:74px;right:16px;height:1px;background:var(--ln)}
+.row.nl+.row::before,.row.nl::before{left:16px}
+.row .tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}.row .tx b{font-size:17px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.row .tx span{font-size:14px;color:var(--mu);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .rt{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex:none}.row .rt b{font-size:16px;font-weight:700}
+.row .gl{width:44px;height:44px;border-radius:14px;background:var(--tb,var(--tint));color:var(--tt,var(--pine));display:grid;place-items:center;flex:none}
+.row.dn .tx b{color:var(--er)}.row.wr .tx span{white-space:normal}.row.wr{align-items:flex-start}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border-radius:99px;font-size:12px;line-height:1;font-weight:650;background:var(--tb,var(--nb));color:var(--tt,var(--nt));white-space:nowrap}
+.card{background:var(--card);border-radius:24px;margin:8px 16px;padding:18px}
+.card.tint{background:var(--tint)}.card.t-er{background:var(--erb);color:var(--ert)}.card.t-wa{background:var(--wab);color:var(--wat)}.card.t-ok{background:var(--okb);color:var(--okt)}
+.kv{display:flex;justify-content:space-between;gap:16px;padding:9px 0;border-top:1px solid var(--ln);font-size:15px}.kv:first-of-type{border:0}.kv span{color:var(--mu)}.kv b{font-weight:650;white-space:nowrap;text-align:right}
+.fin-detail{padding-left:14px}.fold>summary{list-style:none;cursor:pointer}.fold>summary::-webkit-details-marker{display:none}.fold>summary span{display:flex;align-items:center;gap:6px}.fold[open]>summary svg{transform:rotate(90deg)}
+.rent-pays>summary,.client-access>summary{display:flex;justify-content:space-between;align-items:center;font-weight:650}.rate-schedule{margin-top:16px}.rate-schedule>summary{color:var(--pine);font-weight:600}
+.rent-primary .btn{min-width:0;white-space:normal;line-height:1.25;padding:8px 14px}
+.rent-note-heading{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.rent-menu{border-bottom:1px solid var(--ln)}
+.rent-menu>summary{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:17px 0;font-weight:650}
+.rent-menu>div{padding-bottom:10px}
+.rent-menu-row{display:flex;align-items:center;gap:12px;width:100%;min-height:54px;padding:12px 4px;border:0;background:none;text-align:left;font-size:16px;cursor:pointer}
+.rent-menu-row+.rent-menu-row{border-top:1px solid var(--ln)}
+.rent-menu-row span{flex:1;min-width:0;overflow-wrap:anywhere}
+.rent-menu-row>.ic{flex:none;color:var(--mu)}
+.rent-menu-row.danger,.rent-menu-row.danger>.ic{color:var(--ert)}
+.seg[data-seg=term]{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+.big{font-size:34px;line-height:1.1;font-weight:750;letter-spacing:-.025em}.mid{font-size:24px;font-weight:750;letter-spacing:-.02em}
+.note{display:flex;gap:12px;align-items:flex-start;margin:10px 16px;padding:14px 16px;border-radius:18px;background:var(--tb);color:var(--tt);font-size:15px}
+.note b{font-weight:700}.note .btn{margin-top:10px}
+.sub{font-size:13px;color:var(--mu);margin:8px 22px 0;line-height:1.4}
+.bars{padding:4px 0}.br{display:grid;grid-template-columns:96px 1fr auto;gap:12px;align-items:center;padding:6px 0;font-size:14px}.br span{color:var(--mu)}.br i{display:block;height:10px;border-radius:5px;background:var(--track);overflow:hidden}.br i u{display:block;height:100%;background:var(--pine);border-radius:5px}.br b{font-weight:650;white-space:nowrap}
+.issue-year{display:flex;align-items:center;justify-content:space-between;margin:4px 16px}.issue-year b{font-size:18px}.issue-year button:disabled{opacity:.35;cursor:default}
+.issue-chart{padding-inline:12px}.issue-months{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:2px;text-align:center;list-style:none;padding:0;margin:25px 0 0}
+.issue-track{height:132px;display:flex;align-items:flex-end;justify-content:center;border-bottom:1px solid var(--ln)}.issue-bar{position:relative;width:min(17px,80%);background:var(--pine);border-radius:4px 4px 0 0}
+.issue-bar b{position:absolute;bottom:100%;left:50%;transform:translateX(-50%);font-size:12px;margin-bottom:3px;white-space:nowrap}
+.issue-month{display:block;margin-top:6px;font-size:11px;color:var(--mu)}.issue-future .issue-month{opacity:.5}
+.rental-outcomes{width:100%;border-collapse:collapse;text-align:left;font-size:14px;font-variant-numeric:tabular-nums}
+.rental-outcomes th,.rental-outcomes td{padding:8px 6px;border-bottom:1px solid var(--ln)}.rental-outcomes thead th{color:var(--mu);font-size:12px}.rental-outcomes small{display:block;color:var(--mu);font-size:11px}
+.rental-outcomes tbody tr:last-child>*{border:0}
+.source-chart .br{grid-template-columns:minmax(0,1fr) minmax(28px,.7fr) auto}.source-chart .br span{overflow-wrap:anywhere}
+/* buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:50px;padding:0 20px;border-radius:16px;border:0;background:var(--pine);color:var(--on);font-weight:650;font-size:16px;cursor:pointer;text-decoration:none;white-space:nowrap}
+.btn.sec{background:var(--tint);color:var(--pine)}.btn.dng{background:var(--erb);color:var(--ert)}.btn.go{background:var(--go);color:#fff}.btn.blk{display:flex;width:100%}.btn.lg{min-height:62px;font-size:19px;border-radius:20px}.btn.sm{min-height:38px;padding:0 14px;font-size:14px;border-radius:12px}.btn:disabled{opacity:.5}
+.btn.tw{white-space:normal;line-height:1.15;min-height:58px;text-align:left;justify-content:flex-start;padding:0 16px}.btn.tw span{display:flex;flex-direction:column}.btn.tw small{font-size:13px;font-weight:500;opacity:.8}
+.acts{display:flex;gap:10px;flex-wrap:wrap;margin:12px 16px}.acts .btn{flex:1 1 140px}
+.pad{padding:0 20px}
+/* forms */
+.form{padding:0 20px 20px}
+.fld{display:block;margin:16px 0 0}.fld>span{display:block;font-size:14px;font-weight:600;color:var(--mu);margin:0 4px 6px}
+input:not([type=checkbox]):not([type=file]),select,textarea{width:100%;min-height:54px;height:54px;padding:0 16px;border:2px solid transparent;border-radius:16px;background:var(--card);font-size:17px;appearance:none;-webkit-appearance:none;outline:0}
+select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='9' fill='none' stroke='%23778' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M1 1.5l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 16px center;padding-right:44px}
+textarea{min-height:92px;height:auto;padding:14px 16px;resize:none}
+.sh input:not([type=checkbox]),.sh textarea{background:var(--fill)}.sh textarea{font-size:15px}
+input:focus,select:focus,textarea:focus{border-color:var(--pine)}
+.f2{display:grid;grid-template-columns:1fr 1fr;gap:0 12px;align-items:end}
+.seg{display:flex;gap:4px;background:var(--fill);border-radius:16px;padding:4px;margin:8px 16px}.seg.in{margin:0}
+.seg button{flex:1;min-height:42px;border:0;border-radius:12px;background:none;color:var(--mu);font-weight:650;font-size:14px;cursor:pointer;padding:0 4px;white-space:nowrap}.seg button.on{background:var(--card);color:var(--ink);box-shadow:0 1px 4px rgba(0,0,0,.14)}
+.srch{margin:6px 16px 4px;position:relative}.srch input{padding-left:46px!important;background:var(--card)}.srch .ic{position:absolute;left:15px;top:15px;color:var(--mu)}
+.sw{display:flex;align-items:center;gap:14px;padding:14px 16px;cursor:pointer}.sw+.sw{border-top:1px solid var(--ln)}.sw .tx{flex:1}.sw .tx b{display:block;font-weight:650}.sw .tx span{font-size:13px;color:var(--mu);line-height:1.3;display:block}
+.sw input{appearance:none;-webkit-appearance:none;width:52px;height:32px;border-radius:16px;background:var(--track);position:relative;flex:none;margin:0;transition:background .15s;cursor:pointer}
+.sw input::after{content:"";position:absolute;left:3px;top:3px;width:26px;height:26px;border-radius:50%;background:#fff;transition:transform .18s;box-shadow:0 1px 3px rgba(0,0,0,.3)}.sw input:checked{background:var(--go)}.sw input:checked::after{transform:translateX(20px)}
+.pv{background:var(--tint);border-radius:22px;padding:18px;margin:18px 0 6px}.pv .big{color:var(--pine)}.pv .kv{border-color:rgba(47,93,80,.15)}
+.th{position:relative;display:inline-block;margin:8px 10px 0 0}.th img{width:80px;height:80px;object-fit:cover;border-radius:16px;display:block}.th i{position:absolute;top:-8px;right:-8px;background:var(--er);color:#fff;border-radius:50%;width:26px;height:26px;display:grid;place-items:center;font-style:normal;font-size:14px}
+/* the wheel: one segment per weekly payment */
+.wh{display:block;overflow:visible}.wh path,.wh circle{fill:none;stroke-width:var(--w);stroke:var(--track)}
+.wh .p{stroke:var(--pine)}.wh .o{stroke:var(--er)}.wh .x{stroke:var(--wa)}.wh .n{stroke:var(--mu);opacity:.55}
+.wh.rd path,.wh.rd circle{stroke-linecap:round}
+.wh.an path,.wh.an circle{animation:seg .45s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(var(--i)*26ms + .1s)}
+@keyframes seg{from{opacity:0;stroke-width:0}}
+.whw{position:relative;display:grid;place-items:center;flex:none}.whw .in{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;line-height:1.1}
+.whw .in.ini{font-weight:700;font-size:14px;color:var(--ink)}
+.whw .in .k{font-size:44px;font-weight:800;letter-spacing:-.03em}.whw .in small{font-size:15px;color:var(--mu);margin-top:2px}
+.av{width:44px;height:44px;border-radius:50%;background:var(--tb,var(--nb));color:var(--tt,var(--nt));display:grid;place-items:center;font-weight:700;font-size:14px;flex:none}
+/* deal screen */
+.dh{padding:6px 20px 4px}.dh h1{margin:6px 0 2px;font-size:28px;line-height:1.15;font-weight:750;letter-spacing:-.02em}.dh .ph{font-size:19px;font-weight:600}
+.dh .acts{margin:14px 0 0}
+.pg{display:flex;align-items:center;gap:20px}.pg .nx{flex:1;min-width:0}.pg .nx .mu{font-size:14px}
+.per{display:flex;align-items:center;gap:14px;padding:13px 16px;position:relative}.per+.per::before{content:"";position:absolute;top:0;left:58px;right:16px;height:1px;background:var(--ln)}
+.per .dot{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;flex:none;background:var(--track);color:var(--mu);font-size:12px;font-weight:700}
+.per.ok .dot{background:var(--pine);color:var(--on)}.per.er .dot{background:var(--er);color:#fff}
+.per .tx{flex:1;min-width:0}.per .tx b{display:block;font-weight:650}.per .tx span{font-size:13px;color:var(--mu)}.per>b{font-weight:700;white-space:nowrap}
+.per .un{display:inline-block;border:0;background:var(--fill);color:var(--mu);border-radius:10px;padding:6px 12px;font-size:12px;font-weight:650;margin-top:8px;cursor:pointer}.per .tx b{white-space:nowrap}
+/* client screens */
+.cb{margin:16px 16px 0;border-radius:24px;padding:18px 20px;display:flex;align-items:center;gap:14px;background:var(--tb);color:var(--tt);font-size:21px;line-height:1.2;font-weight:750;letter-spacing:-.01em}
+.cb .gl{width:46px;height:46px;border-radius:50%;background:var(--tc);color:#fff;display:grid;place-items:center;flex:none}
+.cw{display:flex;justify-content:center;padding:24px 0 6px}
+.cn{margin:14px 16px 0;background:var(--card);border-radius:24px;padding:20px}.cn .mu{font-size:14px}
+.cn.owe{display:block;width:calc(100% - 32px);border:0;text-align:left;font:inherit;color:inherit;cursor:pointer}.cn.owe:active{transform:scale(.99)}.cn.owe .big{color:var(--ert)}
+.cn .hint,.owb .mu:last-child{display:flex;align-items:center;gap:2px;margin-top:8px;color:var(--pine);font-size:14px;font-weight:650}.owb .mu:last-child{margin-top:2px;color:var(--mu);font-weight:500}
+.owb{display:block;border:0;background:none;padding:0;text-align:left;font:inherit;color:inherit;cursor:pointer}.owb .mid{color:var(--ert)}
+.tl{display:flex;align-items:center;gap:14px;width:100%;min-height:72px;padding:14px 18px;border:0;background:var(--card);border-radius:22px;margin-top:10px;text-align:left;font-size:18px;font-weight:650;cursor:pointer}.tl .gl{width:44px;height:44px;border-radius:14px;background:var(--tint);color:var(--pine);display:grid;place-items:center}.tl>span:not(.gl){flex:1}.tl .ic:last-child{color:var(--mu)}
+.cp{padding:0 16px}
+.rate-weekly{display:block;margin:6px 2px 0}
+.journal-row .tx b,.journal-row .tx span{white-space:normal;overflow-wrap:anywhere}
+.journal-row .tx span{display:block;margin-top:4px}
+.contact-links .tl{color:inherit;text-decoration:none}
+.contact-links .tl+.tl{margin-top:6px}
+/* nav */
+nav{position:fixed;left:0;right:0;bottom:0;z-index:20;display:flex;justify-content:center;pointer-events:none;padding:0 12px max(12px,env(safe-area-inset-bottom));transition:transform .2s}
+nav.hid{transform:translateY(140%)}
+nav .bar{pointer-events:auto;display:flex;width:100%;max-width:520px;background:var(--card);background:var(--nav);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border-radius:30px;padding:8px 6px 7px;box-shadow:var(--sh),0 0 0 1px var(--ln)}
+.tb{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;border:0;background:none;color:var(--mu);font-size:11px;font-weight:650;padding:2px 0;cursor:pointer;min-width:0}
+.tb .pill{width:58px;height:32px;border-radius:16px;display:grid;place-items:center;transition:background .15s}.tb.on{color:var(--pine)}.tb.on .pill{background:var(--tint)}
+.tb.add .pill{width:54px;height:54px;border-radius:27px;background:var(--pine);color:var(--on);margin-top:-26px;box-shadow:0 8px 20px rgba(47,93,80,.35)}.tb.add.on .pill{background:var(--pine)}.tb.add{color:var(--mu)}
+/* sheets and toast */
+.ov{position:fixed;inset:0;z-index:50;background:rgba(10,20,17,0);display:flex;align-items:flex-end;justify-content:center;transition:background .2s}.ov.on{background:rgba(10,20,17,.48)}
+.sh{width:100%;max-width:560px;background:var(--card);border-radius:30px 30px 0 0;padding:10px 20px max(22px,env(safe-area-inset-bottom));transform:translateY(105%);transition:transform .24s cubic-bezier(.2,.8,.2,1);max-height:88vh;overflow:auto}.ov.on .sh{transform:none}
+.sh .grab{width:40px;height:4px;border-radius:2px;background:var(--track);margin:0 auto 16px}.sh h3{margin:0 0 8px;font-size:21px;letter-spacing:-.01em}.sh p{margin:0 0 14px;color:var(--mu);line-height:1.45}.sh .btn{margin-top:10px}
+.sh .opt{display:flex;align-items:center;gap:12px;width:100%;min-height:58px;border:0;background:var(--fill);border-radius:16px;padding:0 16px;margin-top:8px;font-size:17px;font-weight:600;text-align:left;cursor:pointer}.sh .opt span{margin-left:auto;color:var(--mu);font-weight:500;font-size:14px}
+.toast{position:fixed;left:50%;bottom:116px;transform:translate(-50%,16px);opacity:0;background:var(--ink);color:var(--bg);padding:12px 18px;border-radius:16px;font-weight:650;font-size:15px;transition:opacity .2s,transform .2s;z-index:70;max-width:86vw;pointer-events:none;text-align:center}.toast.on{opacity:1;transform:translate(-50%,0)}
+.spin{width:34px;height:34px;border-radius:50%;border:4px solid var(--track);border-top-color:var(--pine);animation:sp .8s linear infinite;margin:30vh auto 0}@keyframes sp{to{transform:rotate(360deg)}}
+.empty{padding:36px 28px;text-align:center;color:var(--mu)}.empty .ic{width:40px;height:40px;margin-bottom:8px;opacity:.6}
+.center{padding:48px 24px 24px;text-align:center}.center h1{margin:18px 0 8px;font-size:28px;letter-spacing:-.02em}.center p{color:var(--mu);margin:0 0 20px;line-height:1.45}
+:focus-visible{outline:3px solid var(--pine);outline-offset:2px}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+.rpd{margin-top:6px}
+.rpl{max-height:min(56vh,430px);overflow-y:auto;overscroll-behavior:contain;border-top:1px solid var(--ln)}
+.rpl .row{min-height:56px;padding:8px 16px 8px 20px}.rpl .row.nl::before{left:20px}.rpl .row.mo{padding-left:38px}.rpl .row.mo::before{left:38px}
+.rpl .row.on{background:var(--tint)}.rpl .row.on .tx b{color:var(--pine)}
+.rpl .row .tx b{font-size:16px}.rpl .row.yr .tx b{font-size:17px;font-weight:750}
+.rpl .row .rt,.rpr .rt{flex-direction:row;align-items:center;gap:8px}.rpl .row .rt b,.rpr .rt b{font-size:16px;font-weight:700;white-space:nowrap}.rpl .row .rt .ic{color:var(--pine)}.rpr .rt .ic{color:var(--mu)}
+.rpr{min-height:62px}
+
+/* аренда */
+.stt{grid-template-columns:repeat(3,1fr)}.stt b{font-size:21px}
+.seg{overflow-x:auto;scrollbar-width:none}.seg::-webkit-scrollbar{display:none}
+.form h3{margin:24px 4px 4px}
+.card .bars .br{grid-template-columns:70px 1fr auto}
+label.btn{cursor:pointer}
+.ib:disabled{cursor:default}
+.hd2{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:10px;padding:22px 20px 10px}
+.hd2 h1{margin:0;font-size:30px;line-height:1.1;font-weight:750;letter-spacing:-.02em}
+.hd2>span{color:var(--mu);font-size:15px;font-weight:600;text-align:center;white-space:nowrap}
+.okl{display:flex;align-items:center;gap:8px;margin:18px 22px 4px;color:var(--mu);font-weight:600}
+.okl .i{color:var(--go)}
+#app{padding-top:calc(var(--tg-safe-area-inset-top,0px) + var(--tg-content-safe-area-inset-top,0px))}
+.chd{padding:22px 24px 6px}.chd small{display:block;color:var(--mu);font-size:14px;font-weight:600}.chd b{display:block;font-size:22px;line-height:1.25;font-weight:700;margin-top:4px}
+.qb{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;min-width:22px;border-radius:50%;border:1.5px solid currentColor;opacity:.6;font-size:13px;font-weight:800;line-height:1;margin-left:8px;vertical-align:middle;cursor:pointer;user-select:none}
+.qb:active{opacity:1}
+.tl .qb,.cb .qb{flex:none!important;width:22px!important;height:22px!important;min-width:22px;padding:0!important;margin:0 6px 0 8px!important;background:none!important;border-radius:50%!important;font-size:13px!important}
+.cn.dcard{border:2px solid var(--ert);background:color-mix(in srgb,var(--ert) 6%,var(--card))}
+</style></head><body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="i-home" viewBox="0 0 24 24"><path d="M3.5 11 12 3.5 20.5 11M5.5 9.5V20h4.5v-5.5h4V20h4.5V9.5"/></symbol>
+<symbol id="i-base" viewBox="0 0 24 24"><rect x="3.5" y="4" width="17" height="6.5" rx="2.2"/><rect x="3.5" y="13.5" width="17" height="6.5" rx="2.2"/><path d="M7 7.25h.01M7 16.75h.01"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="i-chart" viewBox="0 0 24 24"><path d="M5 20v-8M12 20V5M19 20v-5"/></symbol>
+<symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 6.5h8M17 6.5h3M4 12h3M12 12h8M4 17.5h10M19 17.5h1"/><circle cx="14.5" cy="6.5" r="2.3"/><circle cx="9.5" cy="12" r="2.3"/><circle cx="16.5" cy="17.5" r="2.3"/></symbol>
+<symbol id="i-calc" viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="3.2"/><path d="M8.5 7.5h7M8.5 12h.01M12 12h.01M15.5 12h.01M8.5 16h.01M12 16h.01M15.5 16h.01"/></symbol>
+<symbol id="i-phone" viewBox="0 0 24 24"><path d="M5.2 4h3.3l1.7 4.3-2.1 1.4a11.5 11.5 0 0 0 5.2 5.2l1.4-2.1 4.3 1.7v3.3a1.8 1.8 0 0 1-1.9 1.8A15.6 15.6 0 0 1 3.4 5.9 1.8 1.8 0 0 1 5.2 4z"/></symbol>
+<symbol id="i-send" viewBox="0 0 24 24"><path d="M21 3 10.5 13.5M21 3l-6.5 18-4-7.5L3 9.5z"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7.5"/></symbol>
+<symbol id="i-left" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
+<symbol id="i-right" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></symbol><symbol id="i-chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+<symbol id="i-cal" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="3.2"/><path d="M8 3v4M16 3v4M3.5 10h17"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></symbol>
+<symbol id="i-bike" viewBox="0 0 24 24"><circle cx="5.5" cy="16" r="3.5"/><circle cx="18.5" cy="16" r="3.5"/><path d="M5.5 16 9 8h5.5l4 8M9 8 8 6H6M14.5 8 12 16H9"/></symbol>
+<symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0"/></symbol>
+<symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8.5" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 5.2a3.5 3.5 0 0 1 0 6.6M18 14.2a6.5 6.5 0 0 1 3.5 5.8"/></symbol>
+<symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.6 0l3-3a4 4 0 0 0-5.6-5.6l-1 1M14 10a4 4 0 0 0-5.6 0l-3 3a4 4 0 0 0 5.6 5.6l1-1"/></symbol>
+<symbol id="i-down" viewBox="0 0 24 24"><path d="M12 4v11M7 10.5l5 5 5-5M5 20h14"/></symbol>
+<symbol id="i-up" viewBox="0 0 24 24"><path d="M12 15V4M7 8.5l5-5 5 5M5 20h14"/></symbol>
+<symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 3.5 21.5 20h-19zM12 10v4.5M12 17.5h.01"/></symbol>
+<symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3 19.5 6v5.5c0 4.7-3.2 8-7.5 9.5-4.3-1.5-7.5-4.8-7.5-9.5V6z"/><path d="m9 12 2.2 2.2L15.2 10"/></symbol>
+<symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9.5 7V4h5v3M6.5 7l1 13h9l1-13M10 11v5M14 11v5"/></symbol>
+<symbol id="i-edit" viewBox="0 0 24 24"><path d="m4 20 4-1 11-11-3-3L5 16zM14 6l3 3"/></symbol>
+<symbol id="i-receipt" viewBox="0 0 24 24"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6"/></symbol>
+<symbol id="i-swap" viewBox="0 0 24 24"><path d="m17 3.5 3.5 3.5L17 10.5M20.5 7H9a4.5 4.5 0 0 0-4.5 4.5M7 20.5 3.5 17 7 13.5M3.5 17H15a4.5 4.5 0 0 0 4.5-4.5"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+<symbol id="i-box" viewBox="0 0 24 24"><rect x="3.5" y="4" width="17" height="5" rx="1.6"/><path d="M5 9v9.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V9M10 13h4"/></symbol>
+<symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01"/></symbol>
+<symbol id="i-bolt" viewBox="0 0 24 24"><path d="m13 3-8 11h6l-1 7 8-11h-6z"/></symbol>
+<symbol id="i-doc" viewBox="0 0 24 24"><path d="M6.5 3h8l4 4v14h-12zM14 3v5h5M9.5 13h6M9.5 17h6"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="3"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/></symbol>
+<symbol id="i-flag" viewBox="0 0 24 24"><path d="M5.5 21V4M5.5 4.5h12l-2.5 4 2.5 4h-12"/></symbol>
+<symbol id="i-copy" viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="11.5" height="12" rx="2.5"/><path d="M15.5 8.5V6A2.5 2.5 0 0 0 13 3.5H6.5A2.5 2.5 0 0 0 4 6v7.5A2.5 2.5 0 0 0 6.5 16h2"/></symbol>
+<symbol id="i-qr" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="6.5" height="6.5" rx="1.5"/><rect x="14" y="3.5" width="6.5" height="6.5" rx="1.5"/><rect x="3.5" y="14" width="6.5" height="6.5" rx="1.5"/><path d="M14 14h2.5v2.5H14zM18 18h2.5v2.5H18zM14 20.5h2M20.5 14v2"/></symbol></defs></svg>
+<div id="app"><div class="spin" aria-label="Загрузка"></div></div>
+<nav id="nav" style="display:none"><div class="bar" id="navbar"></div></nav>
+<div class="toast" id="toast" role="status"></div>
+<script>
+const T=(window.Telegram&&Telegram.WebApp)||{};
+try{T.ready();T.expand()}catch(e){}
+const $=s=>document.querySelector(s),v=s=>$(s).value,m=n=>Number(n).toLocaleString('ru',{maximumFractionDigits:2})+'\u00A0₽',fmt=d=>d.split('-').reverse().join('.');
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const tx2=t=>esc(t).replace(/\n/g,'<br>');
+const ic=(n,c='')=>`<svg class="ic ${c}" aria-hidden="true"><use href="#i-${n}"/></svg>`;
+const hap=k=>{try{k?T.HapticFeedback.notificationOccurred(k):T.HapticFeedback.impactOccurred('light')}catch(e){}};
+const ABORT={abort:1};
+/* ---------- theme: follows Telegram */
+function setTheme(){const d=T.colorScheme||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light');document.documentElement.dataset.theme=d;
+try{const bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();T.setHeaderColor&&T.setHeaderColor(bg);T.setBackgroundColor&&T.setBackgroundColor(bg)}catch(e){}}
+setTheme();try{T.onEvent('themeChanged',setTheme)}catch(e){}
+/* ---------- dates */
+const WD=['вс','пн','вт','ср','чт','пт','сб'],WF=['воскресенье','понедельник','вторник','среда','четверг','пятница','суббота'],MG=['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+const dow=d=>new Date(d+'T00:00:00Z').getUTCDay(),dnum=d=>+d.slice(8,10);
+const dlong=d=>`${WF[dow(d)]}, ${dnum(d)} ${MG[+d.slice(5,7)-1]}`,dshort=d=>`${dnum(d)} ${MG[+d.slice(5,7)-1]}`;
+const dayWord=n=>{const a=Math.abs(n)%100,b=a%10;return a>10&&a<20?'дней':b==1?'день':b>1&&b<5?'дня':'дней'};
+/* ---------- sheets (windows that slide up) and toast */
+function sheet(html,wire,cancel){return new Promise(res=>{const o=document.createElement('div');o.className='ov';o.innerHTML=`<div class=sh role=dialog aria-modal=true><div class=grab></div>${html}</div>`;document.body.appendChild(o);requestAnimationFrame(()=>requestAnimationFrame(()=>o.classList.add('on')));
+const done=x=>{o.classList.remove('on');setTimeout(()=>o.remove(),240);res(x)};o.addEventListener('click',e=>{if(e.target===o)done(cancel)});wire(o,done)})}
+const uiAlert=(t,title)=>sheet(`${title?`<h3>${esc(title)}</h3>`:''}<p>${tx2(t)}</p><button class="btn blk" data-y>Понятно</button>`,(o,d)=>o.querySelector('[data-y]').onclick=()=>d(),undefined);
+const uiConfirm=(t,yes,o={})=>sheet(`${o.title?`<h3>${esc(o.title)}</h3>`:''}<p>${tx2(t)}</p><button class="btn blk ${o.danger?'dng':''}" data-y>${esc(yes||'Да')}</button><button class="btn sec blk" data-n>Отмена</button>`,(el,d)=>{el.querySelector('[data-y]').onclick=()=>d(true);el.querySelector('[data-n]').onclick=()=>d(false)},false);
+const uiPrompt=(t,v0)=>sheet(`<p>${tx2(t)}</p><input type=number step=0.01 inputmode=decimal value="${esc(v0)}"><button class="btn blk" data-y>Готово</button><button class="btn sec blk" data-n>Отмена</button>`,(o,d)=>{o.querySelector('[data-y]').onclick=()=>d(o.querySelector('input').value);o.querySelector('[data-n]').onclick=()=>d(null)},null);
+const uiPick=(t,L)=>sheet(`<h3>${esc(t)}</h3>${L.map((x,i)=>`<button class=opt data-i=${i}>${esc(x)}</button>`).join('')}<button class="btn sec blk" data-n>Отмена</button>`,(o,d)=>{o.querySelectorAll('[data-i]').forEach(b=>b.onclick=()=>d(L[+b.dataset.i]));o.querySelector('[data-n]').onclick=()=>d(null)},null);
+let tt;function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('on');clearTimeout(tt);tt=setTimeout(()=>e.classList.remove('on'),2200)}
+/* ---------- api */
+const api=async(p,b)=>{const r=await fetch(p,{method:b?'POST':'GET',headers:{'X-Init':T.initData||'','Content-Type':'application/json'},body:b&&JSON.stringify(b)});if(!r.ok){let e;try{e=(await r.json()).err}catch(x){}throw e||'код '+r.status}return r.json()};
+window.onerror=(msg,u,l)=>{uiAlert('Ошибка: '+msg+' (строка '+l+')')};
+window.addEventListener('unhandledrejection',e=>{const r=e.reason;e.preventDefault();if(r===ABORT)return;uiAlert('Ошибка: '+((r&&r.message)||r))});
+/* ---------- QR-код (по алгоритму Nayuki, байтовый режим, уровень коррекции M, версии 1–10) */
+const QR=(()=>{const ECC=[0,10,16,26,18,24,16,18,22,22,26],NB=[0,1,1,1,2,2,4,4,4,5,5],AL=[[],[],[6,18],[6,22],[6,26],[6,30],[6,34],[6,22,38],[6,24,42],[6,26,46],[6,28,50]];
+const raw=v=>{let r=(16*v+128)*v+64;if(v>=2){const n=Math.floor(v/7)+2;r-=(25*n-10)*n-55;if(v>=7)r-=36}return r};
+const mul=(x,y)=>{let z=0;for(let i=7;i>=0;i--){z=(z<<1)^((z>>>7)*0x11D);z^=((y>>>i)&1)*x}return z};
+const rsDiv=d=>{const r=Array(d-1).fill(0).concat([1]);let root=1;for(let i=0;i<d;i++){for(let j=0;j<r.length;j++){r[j]=mul(r[j],root);if(j+1<r.length)r[j]^=r[j+1]}root=mul(root,2)}return r};
+const rsRem=(data,div)=>{const r=div.map(()=>0);for(const b of data){const f=b^r.shift();r.push(0);div.forEach((c,i)=>r[i]^=mul(c,f))}return r};
+function make(text){const bytes=[...new TextEncoder().encode(text)];let v=1;
+for(;v<=10;v++)if(4+(v<10?8:16)+8*bytes.length<=(Math.floor(raw(v)/8)-ECC[v]*NB[v])*8)break;if(v>10)throw 'Слишком длинный текст для QR';
+const dcw=Math.floor(raw(v)/8)-ECC[v]*NB[v],bb=[],ap=(x,l)=>{for(let i=l-1;i>=0;i--)bb.push((x>>>i)&1)};
+ap(4,4);ap(bytes.length,v<10?8:16);bytes.forEach(b=>ap(b,8));ap(0,Math.min(4,dcw*8-bb.length));ap(0,(8-bb.length%8)%8);for(let p=0xEC;bb.length<dcw*8;p^=0xEC^0x11)ap(p,8);
+const data=[];for(let i=0;i<bb.length;i+=8){let x=0;for(let j=0;j<8;j++)x=x<<1|bb[i+j];data.push(x)}
+const nb=NB[v],ec=ECC[v],rc=Math.floor(raw(v)/8),ns=nb-rc%nb,sl=Math.floor(rc/nb),div=rsDiv(ec),bl=[];
+for(let i=0,k=0;i<nb;i++){const d=data.slice(k,k+sl-ec+(i<ns?0:1));k+=d.length;const e=rsRem(d,div);if(i<ns)d.push(0);bl.push(d.concat(e))}
+const all=[];for(let i=0;i<bl[0].length;i++)bl.forEach((b,j)=>{if(i!=sl-ec||j>=ns)all.push(b[i])});
+const n=v*4+17,M=[...Array(n)].map(()=>Array(n).fill(false)),F=[...Array(n)].map(()=>Array(n).fill(false)),set=(x,y,d)=>{M[y][x]=d;F[y][x]=true};
+for(let i=0;i<n;i++){set(6,i,i%2==0);set(i,6,i%2==0)}
+const fin=(x,y)=>{for(let dy=-4;dy<=4;dy++)for(let dx=-4;dx<=4;dx++){const d=Math.max(Math.abs(dx),Math.abs(dy)),a=x+dx,b=y+dy;if(a>=0&&a<n&&b>=0&&b<n)set(a,b,d!=2&&d!=4)}};
+fin(3,3);fin(n-4,3);fin(3,n-4);const al=AL[v],L=al.length;
+al.forEach((a,i)=>al.forEach((b,j)=>{if(!(i==0&&j==0||i==0&&j==L-1||i==L-1&&j==0))for(let dy=-2;dy<=2;dy++)for(let dx=-2;dx<=2;dx++)set(a+dx,b+dy,Math.max(Math.abs(dx),Math.abs(dy))!=1)}));
+const fmt=mask=>{const d=mask;let r=d;for(let i=0;i<10;i++)r=(r<<1)^((r>>>9)*0x537);const bits=(d<<10|r)^0x5412,g=i=>((bits>>>i)&1)!=0;
+for(let i=0;i<=5;i++)set(8,i,g(i));set(8,7,g(6));set(8,8,g(7));set(7,8,g(8));for(let i=9;i<15;i++)set(14-i,8,g(i));
+for(let i=0;i<8;i++)set(n-1-i,8,g(i));for(let i=8;i<15;i++)set(8,n-15+i,g(i));set(8,n-8,true)};
+fmt(0);if(v>=7){let r=v;for(let i=0;i<12;i++)r=(r<<1)^((r>>>11)*0x1F25);const bits=v<<12|r;for(let i=0;i<18;i++){const t=((bits>>>i)&1)!=0,a=n-11+i%3,b=Math.floor(i/3);set(a,b,t);set(b,a,t)}}
+let i=0;for(let right=n-1;right>=1;right-=2){if(right==6)right=5;for(let vert=0;vert<n;vert++)for(let j=0;j<2;j++){const x=right-j,y=((right+1)&2)==0?n-1-vert:vert;
+if(!F[y][x]&&i<all.length*8){M[y][x]=((all[i>>>3]>>>(7-(i&7)))&1)!=0;i++}}}
+for(let y=0;y<n;y++)for(let x=0;x<n;x++)if(!F[y][x]&&(x+y)%2==0)M[y][x]=!M[y][x];fmt(0);return M}
+function svg(text,px=240){const M=make(text),n=M.length,q=4,s=n+2*q;px=s*Math.max(4,Math.floor(px/s));let p='';M.forEach((r,y)=>r.forEach((d,x)=>{if(d)p+=`M${x+q},${y+q}h1v1h-1z`}));
+return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${s} ${s}" width="${px}" height="${px}" shape-rendering="crispEdges" style="background:#fff;border-radius:14px;display:block;margin:0 auto"><path d="${p}" fill="#000"/></svg>`}
+return {make,svg}})();
+/* ---------- данные и роли */
+let S=null,ME=null,V=[['today']],navDir='',lastLoad=0,FIN={mode:'m',off:0},FT='stats',issueChartYear=null,PF='all',QS='';
+const K=k=>S?Object.entries(S.docs[k]||{}).map(([id,d])=>({id,...d})):[];
+const G=(k,id)=>S&&id&&S.docs[k][id]?{id,...S.docs[k][id]}:null;
+const isOwner=()=>ME&&ME.role=='owner',can=p=>isOwner()||!!(ME&&(ME.perms||[]).includes(p)),fin=()=>can('reports');
+const TODAY=()=>S?S.today:ME?.today||new Date().toISOString().slice(0,10);
+const TY={w:'неделя',w2:'2 недели',w3:'3 недели',m:'месяц'},TYA={...TY,w:'неделю'},TY2={w:'нед.',m:'мес.'},LEN={w:7,w2:14,w3:21,m:30};
+const TERMS=[['w','1 неделя'],['w2','2 недели'],['w3','3 недели'],['m','Месяц (30 дней)']];
+const termLabel=t=>TERMS.find(([k])=>k==t)?.[1]||'';
+const money2=n=>Number(n).toLocaleString('ru',{maximumFractionDigits:2})+'\u00A0₽';
+const plural=(n,a,b,c)=>{const x=Math.abs(n)%100,y=x%10;return x>10&&x<20?c:y==1?a:y>1&&y<5?b:c};
+const dd=d=>fmt(d).slice(0,5);
+const WHO=w=>w=='Владе'+'лец'?'Вы':w;
+const MT={cash:'наличные',transfer:'перевод',qr:'QR (СБП)',discount:'скидка'};
+const addD=(d,n)=>{const x=new Date(d+'T00:00:00Z');x.setUTCDate(x.getUTCDate()+n);return x.toISOString().slice(0,10)};
+const diff=(a,b)=>Math.round((new Date(a+'T00:00:00Z')-new Date(b+'T00:00:00Z'))/864e5);
+const rel=n=>n==0?'сегодня':n==1?'завтра':n==-1?'вчера':n>1?`через ${n} ${dayWord(n)}`:`${-n} ${dayWord(n)} назад`;
+const chip=(t,c='t-n')=>`<span class="chip ${c}">${esc(t)}</span>`;
+const ini=n=>String(n||'?').split(/\s+/).slice(0,2).map(x=>x[0]||'').join('').toUpperCase();
+const cname=id=>(G('client',id)||{}).name||'—',bnum=id=>{const b=G('bike',id);return b?(b.num||b.name):'без велосипеда'},bfull=id=>{const b=G('bike',id);return b?`${b.num?b.num+' · ':''}${b.name}`:'без велосипеда'};
+const rentOf=(f,id)=>K('rent').find(r=>r.status=='active'&&r[f]==id);
+const per=r=>`${m(r.st&&r.st.nprice!=null?r.st.nprice:r.price)} / ${TY[r.st&&r.st.ntype||r.type]}`;
+const BS={free:['Свободен','t-ok'],rent:['В аренде','t-bl'],repair:['В ремонте','t-wa'],sold:['Продан','t-n'],off:['Списан','t-n']};
+const bstat=b=>b.rent?'rent':(b.status||'free');
+async function act(a,b={}){return api('/api/act',{a,...b})}
+async function load(){
+    S=await api('/api/all');
+    if(ME?.role=='admin'&&S.perms)ME.perms=S.perms;
+    if(isOwner()&&'backup_reminder' in S){ME.backup=S.backup;ME.backup_reminder=S.backup_reminder;ME.empty=!['rent','bike','client'].some(k=>Object.keys(S.docs[k]||{}).length)}
+    if(ME?.role=='admin'&&Array.isArray(S.perms))ME.perms=S.perms;
+    lastLoad=Date.now()
+}
+async function reload(){await load();render(true)}
+function nav(k){V=[[k]];navDir='';render()}
+function go(s,a){V.push([s,a]);navDir='fw';render()}
+const back=()=>{if(V.length>1){V.pop();navDir='bw'}render()};
+function chrome(){try{const n=ME&&ME.role=='client'?1:V.length;n>1?T.BackButton.show():T.BackButton.hide()}catch(e){}}
+try{T.BackButton.onClick(()=>{if(document.querySelector('.ov'))return;back()})}catch(e){}
+document.addEventListener('visibilitychange',async()=>{
+    if(document.visibilityState!='visible'||Date.now()-lastLoad<=30000||document.querySelector('.ov'))return;
+    try{
+        if(S){await load();render(true)}
+        else if(ME?.role=='client'){
+            const fresh=await api('/api/me');
+            if(fresh.role!='client'){location.reload();return}
+            ME=fresh;lastLoad=Date.now();cui();
+        }
+    }catch(e){}
+});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState=='visible')refreshBackupStatus()});
+window.addEventListener('focus',()=>refreshBackupStatus());
+function navUI(){const R=V[0][0],it=[['today','home','Сегодня'],['park','bike','Парк']];
+if(can('rent_issue'))it.push(['issue','plus','Выдать']);if(fin()||can('exp'))it.push(['fin','chart','Финансы']);it.push(['more','list','Ещё']);
+$('#navbar').innerHTML=it.map(([k,i,n])=>`<button class="tb ${k=='issue'?'add':''} ${R==k?'on':''}" onclick="hap();nav('${k}')" aria-label="${n}"><span class=pill>${ic(i)}</span>${n}</button>`).join('')}
+function render(keep){const[s,a]=V[V.length-1];const f=SCR[s];
+if(!f||(s=='issue'&&!can('rent_issue'))||(s=='fin'&&!fin()&&!can('exp'))||(s=='unkL'&&!can('pay_review'))){
+    V=[['today']];return render()
+}
+const y=keep?scrollY:0,el=$('#app');el.innerHTML=f(a);el.className='';if(navDir){void el.offsetWidth;el.className=navDir}navDir='';scrollTo(0,y);navUI();chrome();
+if(SCR[s].after)SCR[s].after(a)}
+const hd=(t,sm,btn='')=>`<div class=hd><div>${sm?`<small>${esc(sm)}</small>`:''}<h1>${esc(t)}</h1></div>${btn}</div>`;
+const bk=()=>`<button class=back onclick="back()">${ic('left','s')}Назад</button>`;
+const empty=(t,i='box')=>`<div class=empty>${ic(i)}<div>${esc(t)}</div></div>`;
+const kv=(k,v)=>`<div class=kv><span>${esc(k)}</span><b>${v}</b></div>`;
+/* ---------- строка аренды */
+const LATE=s=>Math.max(s.late||0,s.dlate||0),TOT=s=>(s.rent_due??s.debt??0)+(s.dl||0),PEN=s=>(s.pen||0)+(s.dpen||0);
+function rentRow(r,plain){const s=r.st,c=G('client',r.client)||{};let rt,sub,tone='t-bl';const L=LATE(s),pe=PEN(s);
+if(r.waiting){sub=`${bnum(r.bike)} · с ${dd(r.waiting)}`;rt=chip('Ждёт возврата','t-bl')}
+else if(L>0){tone=pe?'t-er':'t-wa';rt=`<b style="color:var(--${pe?'ert':'wat'})">${m(TOT(s))}</b>${chip(L+' '+dayWord(L),pe?'t-er':'t-wa')}`;
+sub=`${bnum(r.bike)}${s.late==0?' · долг':''} · ${pe?'неустойка '+m(pe):s.nopen?'начисление на паузе':s.defer?'отсрочка до '+dd(s.defer):'неустойка с '+dd(s.late>0?s.pfrom:s.dpfrom)}`}
+else if(s.dl>0&&!plain){tone='t-wa';rt=`<b>${m(s.dl)}</b>${chip('до '+dd(s.ddue),'t-wa')}`;sub=`${bnum(r.bike)} · долг · след. оплата ${dd(s.next)}`}
+else{rt=`<b>${m(s.nprice)}</b>${chip(rel(s.left),s.left==0?'t-wa':s.left==1?'t-bl':'t-n')}`;sub=`${bnum(r.bike)} · ${TY[s.ntype]} · оплата ${dd(s.next)}`;if(s.left==0)tone='t-wa';if(s.defer)sub+=' · отсрочка';if(s.dl>0)sub+=' · есть долг'}
+return `<button class=row onclick="go('rent','${r.id}')"><span class="av ${tone}">${esc(ini(c.name))}</span><span class=tx><b>${esc(c.name||'—')}</b><span>${esc(sub)}</span></span><span class=rt>${rt}</span></button>`}
+/* ---------- Сегодня */
+function today(){const act_=K('rent').filter(r=>r.status=='active'),waiting=act_.filter(r=>r.waiting).sort((a,b)=>a.waiting.localeCompare(b.waiting)),ongoing=act_.filter(r=>!r.waiting),
+late=ongoing.filter(r=>LATE(r.st)>0).sort((a,b)=>LATE(b.st)-LATE(a.st)),
+debtors=ongoing.filter(r=>!LATE(r.st)&&r.st.dl>0).sort((a,b)=>a.st.ddue.localeCompare(b.st.ddue)),
+soon=ongoing.filter(r=>!LATE(r.st)).sort((a,b)=>a.st.left-b.st.left||a.st.nprice-b.st.nprice),
+req=K('req').filter(q=>q.status=='pending'&&ongoing.some(r=>r.id==q.rent)),unk=K('unk').filter(u=>u.status=='open'),
+bikes=K('bike').filter(b=>!['sold','off'].includes(b.status)),
+dueT=ongoing.reduce((total,{st})=>total+(st.due_total??((st.left<=0?st.debt||st.nprice:0)+(st.ddue&&st.ddue<=TODAY()?st.dl||0:0))),0);
+let h=`<div class=hd2><h1>Сегодня</h1><span>${esc(dlong(TODAY()))}</span><i></i></div>`;
+h+=backupReminderPanel();
+if(ME.empty&&isOwner())h+=`<div class="note t-bl">${ic('down')}<div><b>База пока пустая.</b><br>Загрузите файл переноса из старого сервиса — велосипеды, клиенты, аренды и платежи появятся сразу.<br><button class="btn sm" onclick="nav('more');setTimeout(()=>go('backup'),0)">Загрузить файл</button></div></div>`;
+h+=`<div class=stt style="grid-template-columns:repeat(3,1fr)"><div><b>${act_.length}/${bikes.length}</b><span>в аренде</span></div><div><b>${late.length}</b><span>просрочено</span></div><div><b>${m(dueT)}</b><span>к оплате сегодня</span></div></div>`;
+if(debtors.length)h+=`<h2 class=sec>Должники <span class=bdg style="background:var(--wa)">${debtors.length}</span></h2><div class=grp>${debtors.map(rentRow).join('')}</div>`;
+if(late.length)h+=`<h2 class="sec t-er">Просрочено <span class=bdg>${late.length}</span></h2><div class=grp>${late.map(rentRow).join('')}</div>`;
+if(waiting.length)h+=`<h2 class=sec>Ждут возврата <span class=bdg>${waiting.length}</span></h2><div class=grp>${waiting.map(rentRow).join('')}</div>`;
+const planned=ongoing.filter(r=>r.return_request).sort((a,b)=>a.return_request.date.localeCompare(b.return_request.date));
+if(planned.length)h+=`<h2 class=sec>Заявки на возврат <span class=bdg>${planned.length}</span></h2><div class=grp>${planned.map(r=>`<button class=row onclick="go('rent','${r.id}')"><span class="gl t-bl">${ic('flag')}</span><span class=tx><b>${esc(cname(r.client))}</b><span>${esc(bnum(r.bike))} · возврат ${fmt(r.return_request.date)}${r.return_request.ack?' · просмотрена':' · новая заявка'}</span></span>${ic('right','s')}</button>`).join('')}</div>`;
+if(req.length)h+=`<h2 class=sec>Заявки на отсрочку <span class=bdg style="background:var(--wa)">${req.length}</span></h2><div class=grp>${req.map(q=>{const r=G('rent',q.rent)||{};return `<div class="row wr nl" style="cursor:default"><span class="av t-wa">${esc(ini(cname(q.client)))}</span><span class=tx><b>${esc(cname(q.client))}</b><span>Просит ${q.days} ${dayWord(q.days)} без неустойки · ${esc(bnum(r.bike))}${r.st?' · оплата '+fmt(r.st.next).slice(0,5):''}</span>${can('defer_requests')?`<span style="display:flex;gap:8px;margin-top:8px"><button class="btn sm" onclick="reqDo('${q.id}',1)">Одобрить</button><button class="btn sm sec" onclick="reqDo('${q.id}',0)">Отклонить</button></span>`:''}</span></div>`}).join('')}</div>`;
+if(unk.length&&can('pay_review'))h+=`<h2 class="sec t-er">Не распознано <span class=bdg>${unk.length}</span></h2><div class=grp>${unk.map(u=>{const r=G('rent',u.rent)||{};return `<button class=row onclick="unkS('${u.id}')"><span class="gl t-er">${ic('alert')}</span><span class=tx><b>${m(u.amt)}</b><span>${esc(r.client?cname(r.client):'')} · ${fmt(u.ts.slice(0,10))}</span></span>${ic('right','s')}</button>`}).join('')}</div>`;
+h+=`<h2 class=sec>Ближайшие оплаты</h2>`+(soon.length?`<div class=grp>${soon.map(r=>rentRow(r,1)).join('')}</div>`:`<div class=grp>${empty('Предстоящих оплат нет','bike')}</div>`);
+return h}
+async function reqDo(id,ok){try{await act('req',{id,ok:!!ok});hap('success');toast(ok?'Отсрочка дана':'Заявка отклонена');await reload()}catch(e){uiAlert(e)}}
+/* ---------- Аренда */
+function rentActions(r){
+const id=r.id,s=r.st,on=r.status=='active',waiting=on&&r.waiting;
+const payment=[],conditions=[],returns=[];
+if(on&&!waiting){
+    const bills=K('bill').filter(b=>b.rent==id&&b.status=='open');
+    if(can('pay_qr'))payment.push(['receipt','QR на оплату',()=>qrS(id)]);
+    if(can('bill')&&!bills.length)payment.push(['send','Выставить платёж клиенту',()=>billS(id)]);
+    for(const bill of bills){
+        const amount=money2(bill.amt);
+        if(can('pay_accept')&&!bill.stale)payment.push(['check','Отметить оплату счёта · '+amount,()=>billPaid(id,bill.id)]);
+        if(can('pay_qr')&&S.cfg.tochka.on&&!bill.stale)payment.push(['qr','QR на выставленный платёж · '+amount,()=>billQR(id,bill.id)]);
+        if(can('bill'))payment.push(['x','Отменить выставленный платёж · '+amount,()=>billVoid(id,bill.id)]);
+    }
+    if(can('rent_rates'))conditions.push(['sliders','Цены продления',()=>rateS(id)]);
+    if(isOwner())conditions.push(['receipt','Скидка на следующую оплату',()=>discountS(r.client)]);
+    if(can('defer_manual'))conditions.push(['clock','Отсрочка',()=>deferS(id)]);
+    if(can('pen_toggle'))conditions.push(['shield',s.nopen?'Вернуть неустойку':'Отключить неустойку',()=>nopenS(id)]);
+    if(can('pen_waive')&&PEN(s)>0)conditions.push(['x','Списать неустойку · '+money2(PEN(s)),()=>waiveS(id)]);
+    if(can('rent_date'))conditions.push(['cal','Исправить дату оплаты',()=>fixS(id)]);
+    if(can('rent_return'))returns.push(['clock','Ждёт возврата',()=>waitS(id)],['flag','Завершить аренду',()=>returnS(id)]);
+}
+if(on&&can('rent_contract'))conditions.push(['doc','Номер договора',()=>contractS(id)]);
+if(on&&can('seize'))returns.push(['lock','Изъять велосипед',()=>seizeS(id),true]);
+if(!on&&r.debt&&can('pay_qr'))payment.push(['receipt','QR на погашение долга',()=>qrS(id,1)]);
+return [['Оплата',payment],['Условия аренды',conditions],['Возврат велосипеда',returns]].filter(([,items])=>items.length)
+}
+async function rentActionsS(id){
+const r=G('rent',id);if(!r)return;
+const groups=rentActions(r);if(!groups.length)return;
+const selected=await sheet(`<h3>Действия</h3><p>${esc(cname(r.client))} · ${esc(bnum(r.bike))}</p>
+${groups.map(([title,items],groupIndex)=>`<details class="fold rent-menu"><summary>${title}${ic('right','s')}</summary><div>${items.map(([icon,label,,danger],actionIndex)=>`<button type=button class="rent-menu-row${danger?' danger':''}" data-group="${groupIndex}" data-action="${actionIndex}">${ic(icon,'s')}<span>${esc(label)}</span>${ic('right','s')}</button>`).join('')}</div></details>`).join('')}
+<button class="btn sec blk" data-close>Закрыть</button>`,(o,done)=>{
+    o.querySelector('[data-close]').onclick=()=>done(null);
+    o.querySelectorAll('[data-action]').forEach(button=>{
+        button.onclick=()=>done(groups[+button.dataset.group][1][+button.dataset.action][2]);
+    });
+},null);
+if(selected)return selected()
+}
+function rent(id){const r=G('rent',id);if(!r)return bk()+empty('Аренда не найдена');const s=r.st,c=G('client',r.client)||{},on=r.status=='active',waiting=on&&r.waiting;
+let h=bk()+`<div class=dh><div>${waiting?chip('Ждёт возврата','t-bl'):on?chip(LATE(s)>0?'Просрочка':s.dl>0?'Долг':'Активна',LATE(s)>0?'t-er':s.dl>0?'t-wa':'t-ok'):chip(r.status=='seized'?'Изъята':'Закрыта','t-n')} ${c.black?chip('чёрный список','t-er'):''}</div>
+<h1 onclick="go('client','${r.client}')" style="cursor:pointer">${esc(c.name||'—')}</h1><div class=mu>${esc(bfull(r.bike))}${r.contract?' · договор №'+esc(r.contract):''}</div></div>`;
+if(waiting)h+=`<div class="card t-bl"><b>Ждём велосипед с ${dshort(waiting)}</b><div class=sm>Начисления остановлены. После возврата завершите аренду.</div></div>`;
+else if(on){const dfr=s.defer?` · отсрочка до ${dshort(s.defer)}`:'';
+if(s.late>0)h+=`<div class="card ${s.pen?'t-er':'t-wa'}"><div class=sm>Просрочка ${s.late} ${dayWord(s.late)} · оплата была ${dshort(s.next)}</div><div class=big>${m(s.rent_due??s.debt)}</div><div class=sm>${s.due_n>1?`за ${s.due_n} ${plural(s.due_n,'период','периода','периодов')}, `:''}${s.pen?`в том числе неустойка ${m(s.pen)}`:s.nopen?'новая неустойка не начисляется':`неустойка начнётся ${dshort(s.pfrom)}`}${dfr}</div></div>`;
+else if(s.firstterm)h+=`<div class="card tint"><div class=sm>Первый срок · ${termLabel(s.firstterm)}</div><div class=big>${money2(s.nprice)}</div><div class=sm>Оплатить до ${dshort(s.next)}${dfr}</div></div>`;
+else h+=`<div class="card ${s.left==0?'t-wa':'tint'}"><div class=sm>${s.left==0?'Оплата сегодня — последний оплаченный день':`Следующая оплата ${rel(s.left)}, ${dshort(s.next)}`}</div><div class=big>${m(s.nprice)}</div><div class=sm>за ${TYA[s.ntype]} · оплачено по ${dshort(s.until)}${s.nopen?' · без неустойки':''}${dfr}</div></div>`;
+if(s.dl>0){const dl=s.dlate>0;h+=`<div class="card ${dl?(s.dpen?'t-er':'t-wa'):'t-wa'}"><div class=sm>${dl?`Долг просрочен на ${s.dlate} ${dayWord(s.dlate)} · срок был ${dshort(s.ddue)}`:`Долг · доплатить до ${dshort(s.ddue)} (${rel(diff(s.ddue,TODAY()))})`}</div><div class=big>${m(s.dl)}</div><div class=sm>${s.dpen?`в том числе неустойка ${m(s.dpen)}`:dl&&!s.nopen?`неустойка начнётся ${dshort(s.dpfrom)}`:'остаток после частичной оплаты'}</div></div>`}
+const BL=K('bill').filter(x=>x.rent==id&&x.status=='open');
+for(const x of BL)h+=`<div class="card t-bl"><div class=sm>Выставлен платёж ${x.kind=='debt'?'в счёт долга':'за период'}${x.due?` · если не хватит — доплатить до ${dshort(x.due)}`:''}</div><div class=big>${m(x.amt)}</div><div class=sm>${x.stale?'Условия изменились. Отмените этот счёт и выставьте новый.':('Клиент видит счёт в приложении'+(S.cfg.tochka.on?' и может оплатить по QR':''))}</div>
+</div>`;
+}else h+=`<div class=card>${kv('Закрыта',fmt(r.closed||''))}${r.debt?kv('Долг клиента',`<span style="color:var(--ert)">${m(r.debt)}</span>`):''}${r.refund?kv('Возвращено клиенту',m(r.refund.amt)):''}${r.writeoff?kv('Списано при изъятии',m(r.writeoff)):''}</div>`;
+const primary=[];
+if(on&&!waiting&&(can('pay_accept')||can('partial')))primary.push(`<button class=btn onclick="payS('${id}')">${ic('check','s')}Принять оплату</button>`);
+if(waiting&&can('rent_return'))primary.push(`<button class=btn onclick="returnS('${id}')">${ic('flag','s')}Завершить аренду</button>`);
+if(!on&&r.debt&&can('pay_accept'))primary.push(`<button class=btn onclick="payDebt('${id}')">${ic('check','s')}Долг погашен</button>`);
+if(rentActions(r).length)primary.push(`<button class="btn sec" onclick="rentActionsS('${id}')">${ic('list','s')}Действия</button>`);
+if(primary.length)h+=`<div class="acts rent-primary">${primary.join('')}</div>`;
+if(on&&r.return_request){const rq=r.return_request;h+=`<div class="card t-bl"><b>Клиент планирует возврат ${fmt(rq.date)}</b>${rq.note?`<div class=sm style="margin-top:6px">${tx2(rq.note)}</div>`:''}<div class=sm>Заявка ${rq.ack?'просмотрена':'ожидает просмотра'}. Аренда продолжается до фактического возврата.</div>${!rq.ack&&can('rent_return')?`<button class="btn sec blk" style="margin-top:10px" onclick="doAct('returnack',{id:'${id}',v:V_('${id}')},'Заявка просмотрена').catch(()=>{})">Отметить просмотренной</button>`:''}</div>`}
+if(on&&c.discount)h+=discountCard(c);
+h+=clientAccess(r.client);
+const ch=(r.plan||[]).filter(x=>x.k>(on?s.paid:0)).map(x=>`с периода ${x.k}: ${m(x.price)} / ${TY[x.type]}`),once=Object.entries(r.once||{}).filter(([k])=>+k>(on?s.paid:0)).map(([k,p])=>`разово, период ${k}: ${m(p)}`);
+h+=`<h2 class=sec>Условия</h2><div class=card>${on?kv('Тариф',per(r)):kv('Тариф',`${r.price?m(r.price)+' / ':''}${TY[r.type]}`)}${ch.concat(once).map(x=>kv('Запланировано',esc(x))).join('')}
+${on?kv('Неустойка',s.nopen?'отключена':`${S.cfg.pen}% в день с ${(S.cfg.grace||0)+1}-го дня`):''}${(r.waived||[]).length?kv('Списано неустойки',m(r.waived.reduce((a,x)=>a+x.amt,0))):''}${kv('Выдан',fmt(r.issued||r.start))}${r.free?kv('Первый день','бесплатно'):''}${on?kv('Оплачено периодов',s.paid):''}${kv('Всего оплачено',m((r.pays||[]).reduce((a,p)=>a+p.amt,0)))}${r.imported?kv('Источник','перенос из старого сервиса'):''}</div>`;
+if(r.note||can('rent_note'))h+=`<div class=card><div class=rent-note-heading><span class="sm mu">Внутренняя заметка</span>${can('rent_note')?`<button class="btn sm sec" onclick="rentNoteS('${id}')" aria-label="${r.note?'Изменить':'Добавить'} заметку по аренде">${r.note?'Изменить':'Добавить'}</button>`:''}</div>${r.note?`<div class=sm style="margin-top:8px">${tx2(r.note)}</div>`:''}</div>`;
+const P=(r.pays||[]).map((p,i)=>({...p,i})).reverse();
+h+=`<details class="fold rent-pays"><summary class=card><span>${ic('right','s')}Платежи</span><b class=mu>${P.length}</b></summary>`+
+(P.length?`<div class=grp>${P.map(p=>`<div class="row nl" style="cursor:default;min-height:58px"><span class=tx><b>${money2(p.amt)}</b><span>${fmt(p.ts.slice(0,10))} · ${MT[p.method]||p.method}${p.kind=='part'?' · частично за период':p.term?' · '+termLabel(p.term):p.n?` · ${p.n} ${plural(p.n,'период','периода','периодов')}`:p.kind=='debt'?' · в счёт долга':''}${p.discount?` · скидка ${money2(p.discount)}`:''}${p.pen?` · неустойка ${money2(p.pen)}`:''}${p.by?' · '+esc(WHO(p.by)):''}</span></span>${can('pay_delete')&&(isOwner()||['cash','transfer'].includes(p.method))&&!p.qr&&!p.old&&p.i==(r.pays||[]).length-1&&on&&!waiting?`<button class="btn sm sec" onclick="payDel('${id}',${p.i})">${ic('trash','s')}</button>`:''}</div>`).join('')}</div>`:`<div class=grp>${empty('Платежей ещё нет','receipt')}</div>`)+'</details>';
+if((r.defer||[]).length)h+=`<h2 class=sec>Отсрочки</h2><div class=grp>${r.defer.slice().reverse().map(x=>`<div class="row nl" style="cursor:default;min-height:54px"><span class=tx><b>до ${fmt(x.until)}</b><span>с ${fmt(x.from)} · ${esc(WHO(x.by||''))}${x.req?' · по заявке клиента':''}</span></span></div>`).join('')}</div>`;
+return h+paymentDisciplinePanel([r])}
+const V_=id=>(G('rent',id)||{})._v;
+async function nopenS(id){const r=G('rent',id),on=!r.st.nopen;if(!await uiConfirm(on?'Неустойка этому клиенту начисляться не будет, пока вы её не вернёте. Уже начисленная остаётся — её можно списать отдельно.':'При просрочке неустойка снова будет начисляться.',on?'Отключить':'Вернуть',{title:on?'Без неустойки':'Вернуть неустойку'}))return;doAct('nopen',{id,on,v:V_(id)},on?'Неустойка отключена':'Неустойка снова начисляется').catch(()=>{})}
+async function waiveS(id){const r=G('rent',id);if(!await uiConfirm(`Списать ${m(PEN(r.st))}? Если просрочка продолжится, со следующего дня неустойка снова начнёт начисляться.`,'Списать',{title:'Списать неустойку'}))return;doAct('waive',{id,v:V_(id)},'Неустойка списана').catch(()=>{})}
+async function doAct(a,b,msg){
+    let result;
+    try{result=await act(a,b)}catch(e){hap('error');uiAlert(String(e));throw ABORT}
+    hap('success');if(msg)toast(msg);
+    try{await reload()}catch(e){uiAlert('Изменение сохранено. Обновите приложение, чтобы увидеть его.')}
+    return result;
+}
+function seg(name,opts,cur){return `<div class="seg in" data-seg="${name}">${opts.map(([k,t])=>`<button type=button data-v="${k}" class="${k==cur?'on':''}">${esc(t)}</button>`).join('')}</div>`}
+function wireSeg(o,cb){o.querySelectorAll('[data-seg]').forEach(g=>g.querySelectorAll('button').forEach(b=>b.onclick=()=>{g.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x==b));g.dataset.val=b.dataset.v;cb&&cb()}))}
+const segv=(o,n)=>{const g=o.querySelector(`[data-seg="${n}"]`);return g.dataset.val||(g.querySelector('.on')||{}).dataset.v};
+function paymentOptions(s,terms){
+if(s.firstterm)return seg('term',[[s.firstterm,termLabel(s.firstterm)]],s.firstterm);
+if(terms&&terms.length)return seg('term',TERMS.filter(([key])=>terms.includes(key)),s.ntype);
+const counts=s.ntype=='w'?[1,2,3,4]:[1,2,3];
+return seg('n',counts.map(n=>[n,s.ntype=='w'?n+' нед.':n==1?'Месяц (30 дней)':n+' мес.']),Math.min(s.due_n||1,counts.length))
+}
+const selectedPeriod=o=>o.querySelector('[data-seg=term]')?{term:segv(o,'term')}:{n:+segv(o,'n')};
+const quoteDetails=q=>`${q.discount?'Скидка −'+money2(q.discount)+' · ':''}В пересчёте на неделю ${money2(q.weekly)} · период ${fmt(q.from)} – ${fmt(q.to)}${q.pen?' · неустойка '+money2(q.pen):''}${q.dl?' · долг '+money2(q.dl):''}`;
+async function payS(id){const r=G('rent',id),s=r.st,modes=[];
+if(can('pay_accept'))modes.push(['p','За период']);
+if(can('partial'))modes.push(['x','Частично']);
+if(can('pay_accept')&&s.dl>0)modes.push(['d','Долг']);
+if(!modes.length)return;
+const initial=can('pay_accept')&&s.dl>0&&!s.late?'d':modes[0][0];
+await sheet(`<h3>Принять оплату</h3><p>${esc(cname(r.client))} · ${esc(bnum(r.bike))}</p>${modes.length>1?seg('md',modes,initial):''}
+<div data-m=p><div class=fld><span>Период оплаты</span>${paymentOptions(s,Object.keys(r.rates||{}))}</div></div>
+<div data-m=x style="display:none"><label class=fld><span>Сколько внёс клиент, ₽</span><input id=pa type=number step=0.01 inputmode=decimal></label><label class=fld><span>Остаток доплатить до</span><input id=pd type=date value="${addD(TODAY(),S.cfg.ddays||3)}" min="${TODAY()}"></label></div>
+<div data-m=d style="display:none"><label class=fld><span>Сумма в счёт долга, ₽</span><input id=da type=number step=0.01 inputmode=decimal value="${s.dl||''}"></label></div>
+<label class=fld><span>Способ</span>${seg('m',[['cash','Наличные'],['transfer','Перевод']],'cash')}</label>
+<div class=pv><div class=sm id=qh>К оплате</div><div class=big id=qa>…</div><div class=sm id=qd></div></div>
+<button class="btn blk lg" data-y disabled>Оплата получена</button><button class="btn sec blk" data-n>Отмена</button>`,(o,d)=>{let seq=0,shown;const Y=o.querySelector('[data-y]'),md=()=>o.querySelector('[data-seg=md]')?segv(o,'md'):initial;
+const upd=async()=>{const M=md(),req=++seq;o.querySelectorAll('[data-m]').forEach(e=>e.style.display=e.dataset.m==M?'':'none');Y.disabled=true;
+try{if(M=='d'){const a=+o.querySelector('#da').value||0;o.querySelector('#qh').textContent='В счёт долга';o.querySelector('#qa').textContent=m(a);o.querySelector('#qd').textContent=a>=s.dl?'долг будет закрыт':`останется ${m(s.dl-a)}`;Y.disabled=!(a>0&&a<=s.dl);return}
+const q=await act('quote',{id,...(M=='x'?{n:1}:selectedPeriod(o))});if(req!=seq)return;shown=q;
+if(M=='p'){o.querySelector('#qh').textContent='К оплате';o.querySelector('#qa').textContent=money2(q.amt);o.querySelector('#qd').textContent=quoteDetails(q);Y.disabled=false}
+else{const a=+o.querySelector('#pa').value||0;o.querySelector('#qh').textContent='Внесено';o.querySelector('#qa').textContent=m(a);o.querySelector('#qd').textContent=`из ${m(q.amt)} за период ${fmt(q.from)} – ${fmt(q.to)} · долг ${m(Math.max(0,q.amt-a))} до ${dshort(o.querySelector('#pd').value)}`;Y.disabled=!(a>0&&a<q.amt)}}
+catch(e){if(req==seq){o.querySelector('#qa').textContent='—';o.querySelector('#qd').textContent=e}}};
+wireSeg(o,upd);upd();['#pa','#pd','#da'].forEach(k=>o.querySelector(k).oninput=upd);o.querySelector('[data-n]').onclick=()=>d();
+Y.onclick=async()=>{Y.disabled=true;const M=md(),mt=segv(o,'m');try{
+if(M=='p')await doAct('pay',{id,...selectedPeriod(o),expected:shown.amt,expected_quote:shown.stamp,method:mt,v:r._v},'Оплата записана');
+else if(M=='x')await doAct('paypart',{id,amt:+o.querySelector('#pa').value,due:o.querySelector('#pd').value,expected:shown.amt,expected_quote:shown.stamp,method:mt,v:r._v},'Частичная оплата записана');
+else await doAct('paydl',{id,amt:+o.querySelector('#da').value,method:mt,v:r._v},'Долг уменьшен');d()}catch(e){d()}}})}
+async function billS(id){const r=G('rent',id),s=r.st,ks=[['period','За период']];if(s.dl>0)ks.push(['debt','В счёт долга']);let full=null;
+await sheet(`<h3>Выставить платёж</h3><p>Клиент увидит его у себя в приложении${S.cfg.tochka.on?' и сможет оплатить по QR — оплата отметится сама':'. Когда он заплатит, нажмите «Оплачено»'}.</p>${ks.length>1?seg('k',ks,'period'):''}
+<label class=fld><span>Сумма, ₽</span><input id=ba type=number step=0.01 inputmode=decimal></label>
+<div id=bdw><label class=fld><span>Если сумма меньше платежа — остаток доплатить до</span><input id=bd type=date value="${addD(TODAY(),S.cfg.ddays||3)}" min="${TODAY()}"></label></div>
+<div class=pv><div class=sm id=bh></div></div><button class="btn blk lg" data-y>Выставить</button><button class="btn sec blk" data-n>Отмена</button>`,(o,d)=>{
+const K_=()=>o.querySelector('[data-seg=k]')?segv(o,'k'):'period',A_=o.querySelector('#ba');
+const upd=async(reset)=>{const k=K_();if(k=='debt'){if(reset)A_.value=s.dl;o.querySelector('#bdw').style.display='none';o.querySelector('#bh').textContent=`Долг сейчас ${m(s.dl)}`;return}
+if(full==null){try{full=(await act('quote',{id,n:1})).amt}catch(e){}}if(reset)A_.value=full;const a=+A_.value||0;o.querySelector('#bdw').style.display=a&&a<full?'':'none';
+o.querySelector('#bh').textContent=`Полный платёж за период ${m(full)}${a&&a<full?` · остаток ${m(full-a)} станет долгом`:''}`};
+wireSeg(o,()=>upd(true));upd(true);A_.oninput=()=>upd(false);o.querySelector('[data-n]').onclick=()=>d();
+o.querySelector('[data-y]').onclick=()=>doAct('bill',{id,kind:K_(),amt:+A_.value,due:o.querySelector('#bd').value,v:V_(id)},'Платёж выставлен').finally(()=>d()).catch(()=>{})})}
+async function billPaid(id,bid){const x=await uiPick('Как клиент оплатил?',['Наличные','Перевод']);if(!x)return;doAct('billpaid',{id,bill:bid,method:x=='Наличные'?'cash':'transfer',v:V_(id)},'Оплата записана').catch(()=>{})}
+async function billVoid(id,bid){if(await uiConfirm('Клиент больше не увидит этот платёж.','Отменить платёж',{danger:true}))doAct('billvoid',{id,bill:bid,v:V_(id)},'Платёж отменён').catch(()=>{})}
+async function billQR(id,bid){let q;try{q=await act('qr',{id,bill:bid,v:V_(id)})}catch(e){return uiAlert(e)}await showQR(q.qr,cname(G('rent',id).client));await reload()}
+async function payDebt(id){const r=G('rent',id);if(!await uiConfirm(`Отметить, что клиент погасил долг ${m(r.debt)}?`,'Долг погашен'))return;await doAct('paydebt',{id,v:V_(id)},'Долг погашен').catch(()=>{})}
+async function payDel(id,k){if(!await uiConfirm('Удалить последний платёж? Его сумма и оплаченный срок будут отменены, остаток долга и разовая скидка восстановятся, если они изменились при оплате.','Удалить',{danger:true}))return;await doAct('paydel',{id,k,v:V_(id)},'Платёж удалён').catch(()=>{})}
+async function qrS(id,debt){if(!S.cfg.tochka.on)return uiAlert('Чтобы выставлять QR, подключите Точку: Ещё → Настройки → Оплата по QR. Пока оплату можно отметить вручную.','QR не подключён');
+const r=G('rent',id),title=`${cname(r.client)} · ${bnum(r.bike)}`;
+if(!debt&&(r.rates||r.st.firstterm))return qrPeriodS(r.st,Object.keys(r.rates||{}),(a,b)=>act(a,{id,...b,v:r._v}),async q=>{await showQR(q,title);await reload()},()=>qrS(id,true));
+let n=1,wd=false,donly=!!debt;if(!debt){const pn=r.st.ntype=='w'?['1','2','3','4']:['1','2','3'],o=pn.map(k=>k+' '+TY2[r.st.ntype]);
+if(r.st.dl>0)o.push(...pn.slice(0,2).map(k=>k+' '+TY2[r.st.ntype]+' + долг'),'Только долг');const x=await uiPick('QR на что?',o);if(!x)return;donly=x=='Только долг';wd=x.includes('долг');n=parseInt(x)||0}
+let q;try{q=await act('qr',{id,n:debt?0:n,debt:wd&&!donly,debtonly:donly,v:V_(id)})}catch(e){return uiAlert(e)}await showQR(q.qr,title);await reload()}
+async function saveQR(payload,amt){try{const M=QR.make(payload),n=M.length,k=Math.max(12,Math.ceil(560/(n+8))),q=4,w=(n+2*q)*k,h=w+100,c=document.createElement('canvas');c.width=w;c.height=h;const g=c.getContext('2d');
+g.fillStyle='#fff';g.fillRect(0,0,w,h);g.fillStyle='#000';M.forEach((r,y)=>r.forEach((d,x)=>{if(d)g.fillRect((x+q)*k,(y+q)*k,k,k)}));
+g.textAlign='center';g.font='bold 30px sans-serif';g.fillText('Оплата аренды · '+m(amt),w/2,w+30);g.font='22px sans-serif';g.fillStyle='#555';g.fillText('СБП · действует до конца дня',w/2,w+66);
+const png=c.toDataURL('image/png'),r=await api('/api/qrimg',{png}),url=location.origin+r.url;
+if(T.downloadFile&&T.isVersionAtLeast&&T.isVersionAtLeast('8.0')){T.downloadFile({url,file_name:'qr-oplata.png'});return}
+try{const blob=await (await fetch(png)).blob(),file=new File([blob],'qr-oplata.png',{type:'image/png'});if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file]});return}}catch(e){}
+(T.openLink?T.openLink(url):open(url));uiAlert('Картинка откроется в браузере. Нажмите на неё и удерживайте, затем выберите «Сохранить в Фото».')}catch(e){uiAlert('Не удалось сохранить картинку: '+e)}}
+async function showQR(qid,title,client){let q;try{q=await api('/api/qr/'+qid)}catch(e){return uiAlert(e)}
+if(q.status!='open')return uiAlert(q.result=='review'?'Деньги поступили. Платёж проверяется.':q.status=='paid'?'Оплата уже получена':'QR больше не действует');
+let timer;
+await sheet(`<h3>${client?'Оплата по QR':'QR на оплату'}${client?QB('qrhow'):''}</h3><p>${esc(title||'')}</p><div class=pv style="text-align:center"><div class=big>${money2(q.amt)}</div><div class=sm>${q.pen?'в том числе неустойка '+money2(q.pen)+' · ':''}действует до конца дня</div>
+<div data-code style="margin:14px 0 0">${q.img?`<img src="data:image/png;base64,${esc(q.img)}" alt="QR" style="width:230px;height:230px;margin:0 auto;display:block;border-radius:16px;background:#fff">`:QR.svg(q.payload,230)}</div></div>
+<div id=qs class="note t-bl" style="margin:10px 0">${ic('clock','s')}<div>Ждём оплату…</div></div>
+<a class="btn blk lg" href="${esc(q.payload)}" target=_blank rel=noopener>${ic('link','s')}Открыть в приложении банка</a>
+<button class="btn sec blk" data-g>${ic('down','s')}Сохранить QR в галерею</button>
+${client?`<div class=card style="margin:14px 0 6px;padding:16px 18px"><b>Если банк не открылся</b><ol style="margin:8px 0 0;padding-left:20px;line-height:1.5">
+<li>Нажмите «Сохранить QR в галерею».</li><li>Откройте приложение своего банка (или его сайт).</li><li>Выберите «Оплата по QR» или «Сканировать», затем «Из галереи», и выберите сохранённую картинку.</li><li>Подтвердите оплату — через пару минут она сама отметится здесь.</li></ol>
+<div class=sm style="margin-top:8px;color:var(--mu)">Ещё можно отсканировать этот QR камерой другого телефона.</div></div>`:
+`<button class="btn sec blk" data-s>${ic('send','s')}Отправить клиенту</button><button class="btn sec blk" data-c>${ic('copy','s')}Скопировать ссылку</button>`}<button class="btn sec blk" data-x>Закрыть</button>`,(o,d)=>{
+o.querySelector('[data-x]').onclick=()=>d();o.querySelector('[data-g]').onclick=()=>saveQR(q.payload,q.amt);
+const s=o.querySelector('[data-s]');if(s)s.onclick=()=>T.openTelegramLink('https://t.me/share/url?url='+encodeURIComponent(q.payload)+'&text='+encodeURIComponent('Оплата аренды: '+m(q.amt)));
+const c=o.querySelector('[data-c]');if(c)c.onclick=async()=>{try{await navigator.clipboard.writeText(q.payload);toast('Ссылка скопирована')}catch(e){}};
+const poll=async()=>{
+    try{
+        const x=await api('/api/qr/'+qid);
+        if(x.status=='open')return;
+        for(const button of o.querySelectorAll('[data-code],a[href],[data-g],[data-s],[data-c]'))button.style.display='none';
+        const status=o.querySelector('#qs'),paid=x.status=='paid'&&x.result!='review';
+        if(paid)hap('success');
+        status.className='note '+(paid?'t-ok':x.result=='review'?'t-wa':'t-n');
+        status.textContent=paid?'Оплачено':x.result=='review'?'Деньги поступили. Платёж проверяется.':'QR больше не действует';
+        clearInterval(timer);
+    }catch(e){}
+};
+timer=setInterval(()=>{if(!document.body.contains(o)){clearInterval(timer);return}poll()},5000)},null);clearInterval(timer)}
+async function deferS(id){const r=G('rent',id),def=addD(r.st.late>0?TODAY():r.st.next,3);
+await sheet(`<h3>Отсрочка без неустойки</h3><p>Пока отсрочка действует, неустойка не начисляется. Следующий период не сдвигается.</p>
+<label class=fld><span>До какой даты включительно</span><input type=date id=du value="${def}" min="${TODAY()}"></label>
+<button class="btn blk lg" data-y>Дать отсрочку</button>${r.st.defer?`<button class="btn dng blk" data-u>Снять текущую отсрочку</button>`:''}<button class="btn sec blk" data-n>Отмена</button>`,(o,d)=>{
+o.querySelector('[data-n]').onclick=()=>d();o.querySelector('[data-y]').onclick=()=>doAct('defer',{id,until:o.querySelector('#du').value,v:V_(id)},'Отсрочка дана').finally(()=>d()).catch(()=>{});
+const u=o.querySelector('[data-u]');if(u)u.onclick=()=>doAct('undefer',{id,v:V_(id)},'Отсрочка снята').finally(()=>d()).catch(()=>{})})}
+function weeklyRate(amount,key){
+const value=Number(amount);
+return value>=1&&Number.isFinite(value)?money2(value*7/LEN[key])+' в неделю':'—';
+}
+function rateFields(rates,required=false,weekly=false){
+return `<div class=f2>${TERMS.map(([key,label])=>`<label class=fld><span>${label}, ₽</span><input type=number min=1 step=0.01 inputmode=decimal ${required?'required':''} data-rate="${key}" value="${esc(rates[key]??'')}">${weekly?`<small class="sm mu rate-weekly" data-weekly="${key}">${weeklyRate(rates[key],key)}</small>`:''}</label>`).join('')}</div>`;
+}
+const rateValues=inputs=>Object.fromEntries([...inputs].map(input=>[input.dataset.rate,input.value]));
+async function rateS(id){
+const r=G('rent',id),s=r.st,rates=r.rates||{},first=r.once?.[s.paid+1]??'';
+await sheet(`<h3>Цены продления</h3><p>${s.firstterm?'Цены продления действуют после первого срока.':'Цены действуют с ближайшего неоплаченного срока.'}</p>
+${rateFields(rates)}
+<label class=fld><span>${s.paid?'Разовая цена на следующий срок':'Цена на первый срок'}, ₽</span><input id=rate-first type=number min=1 step=0.01 inputmode=decimal placeholder="Обычная цена" value="${first}"></label>
+<p class=sm id=rate-hint></p>
+<details class="fold rate-schedule"><summary><span>${ic('right','s')}График оплаты</span></summary>
+<div class=fld><span>Базовый период</span>${seg('t',[['w','1 неделя'],['m','Месяц (30 дней)']],s.basetype||s.ntype)}</div>
+<label class=fld><span>Базовая цена, ₽</span><input id=rate-base type=number min=1 step=0.01 inputmode=decimal required value="${s.baseprice??s.nprice}"></label>
+</details>
+<button class="btn blk" data-y>Сохранить</button><button class="btn sec blk" data-n>Отмена</button>`,(o,d)=>{
+const y=o.querySelector('[data-y]'),inputs=[...o.querySelectorAll('[data-rate]')],special=o.querySelector('#rate-first'),base=o.querySelector('#rate-base');
+const updateHint=()=>o.querySelector('#rate-hint').textContent=s.firstterm
+    ? `Разовая цена действует на первый срок (${termLabel(s.firstterm).toLowerCase()}).`
+    : `Разовая цена действует на базовый срок (${segv(o,'t')=='w'?'1 неделя':'30 дней'}).`;
+wireSeg(o,updateHint);updateHint();o.querySelector('[data-n]').onclick=()=>d();
+y.onclick=async()=>{
+const invalid=[...inputs,special,base].find(input=>!input.checkValidity());
+if(invalid){if(invalid==base)o.querySelector('.rate-schedule').open=true;invalid.reportValidity();return}
+const filled=inputs.filter(input=>input.value!=='');
+if(filled.length&&filled.length!=inputs.length){uiAlert('Для выбора сроков заполните все четыре цены.');return}
+const tariffs=rateValues(filled);
+y.disabled=true;try{await doAct('rates',{id,rates:tariffs,schedule:{type:segv(o,'t'),price:base.value},first:special.value,v:r._v},'Цены продления сохранены');d()}catch(e){y.disabled=false}}})}
+async function rentNoteS(id){
+const r=G('rent',id);
+await sheet(`<h3>Внутренняя заметка по аренде</h3><label class=fld><textarea id=rn maxlength=500 rows=4 aria-label="Заметка по аренде">${esc(r.note||'')}</textarea></label>
+<button class="btn blk" data-y>Сохранить</button><button class="btn sec blk" data-n>Отмена</button>`,(o,d)=>{
+const y=o.querySelector('[data-y]');o.querySelector('[data-n]').onclick=()=>d();
+y.onclick=async()=>{y.disabled=true;try{await doAct('rentnote',{id,note:o.querySelector('#rn').value,v:r._v},'Заметка сохранена');d()}catch(e){y.disabled=false}}})}
+async function waitS(id){
+const r=G('rent',id);
+if(await uiConfirm('Начисления и напоминания по аренде остановятся. Велосипед освободится после завершения аренды.','Ждёт возврата',{title:'Перевести в ожидание возврата?'}))
+await doAct('waitreturn',{id,v:r._v},'Аренда ждёт возврата').catch(()=>{})
+}
+async function returnS(id){const r=G('rent',id);
+await sheet(`<h3>Завершить аренду</h3><p>Велосипед вернули: аренда закроется, велосипед станет свободным, у клиента не будет активной аренды.</p>
+<label class=fld><span>Вернуть клиенту, ₽ (за неиспользованные дни)</span><input type=number min=0 step=0.01 inputmode=decimal id=rf></label>
+<label class=fld><span>Долг клиента, ₽</span><input type=number min=0 step=0.01 inputmode=decimal id=rd></label>
+<button class="btn blk lg" data-y>Завершить аренду</button><button class="btn sec blk" data-n>Отмена</button>`,(o,d)=>{o.querySelector('[data-n]').onclick=()=>d();
+const y=o.querySelector('[data-y]'),refund=o.querySelector('#rf'),debt=o.querySelector('#rd');
+y.onclick=async()=>{if(!refund.reportValidity()||!debt.reportValidity())return;y.disabled=true;
+try{await doAct('return',{id,refund:refund.value,debt:debt.value,v:r._v},'Аренда завершена');d()}catch(e){y.disabled=false}}})}
+async function seizeS(id){const r=G('rent',id),s=r.st;
+await sheet(`<h3>Изъять велосипед?</h3><p>Аренда закроется, <b>все долги и неустойка клиента обнулятся</b>${s.debt?` (сейчас ${m(s.rent_due??s.debt)})`:''}. Сумма попадёт в отчёт как недополученная. Отменить нельзя.</p>
+<label class=fld><span>Для подтверждения напишите ИЗЪЯТЬ</span><input id=cf autocomplete=off></label>
+<button class="btn dng blk lg" data-y>Изъять</button><button class="btn sec blk" data-n>Отмена</button>`,(o,d)=>{o.querySelector('[data-n]').onclick=()=>d();
+o.querySelector('[data-y]').onclick=()=>{const c=o.querySelector('#cf').value.trim().toUpperCase();if(c!='ИЗЪЯТЬ')return toast('Напишите ИЗЪЯТЬ');doAct('seize',{id,confirm:c,v:V_(id)},'Велосипед изъят').finally(()=>d()).catch(()=>{})}})}
+async function contractS(id){const r=G('rent',id);await sheet(`<h3>Номер договора</h3><input id=cn value="${esc(r.contract||'')}"><button class="btn blk" data-y>Сохранить</button><button class="btn sec blk" data-n>Отмена</button>`,(o,d)=>{o.querySelector('[data-n]').onclick=()=>d();o.querySelector('[data-y]').onclick=()=>doAct('contract',{id,contract:o.querySelector('#cn').value,v:V_(id)},'Сохранено').finally(()=>d()).catch(()=>{})})}
+async function fixS(id){const r=G('rent',id);await sheet(`<h3>Исправить дату оплаты</h3><p>Для исправления ошибок: все будущие периоды сдвинутся. Сейчас следующая оплата ${dshort(r.st.next)}.</p><input type=date id=fx value="${r.st.next}"><button class="btn blk" data-y>Сохранить</button><button class="btn sec blk" data-n>Отмена</button>`,(o,d)=>{o.querySelector('[data-n]').onclick=()=>d();o.querySelector('[data-y]').onclick=()=>doAct('fix',{id,next:o.querySelector('#fx').value,v:V_(id)},'Дата исправлена').finally(()=>d()).catch(()=>{})})}
+/* ---------- Выдача */
+const IS={};
+function sourceField(id,value){
+return `<label class=fld><span>Откуда пришёл</span><input id="${id}" list="${id}-options" maxlength=40 value="${esc(value||'')}" placeholder="Авито, рекомендация, Telegram…"></label>
+<datalist id="${id}-options"><option value="Авито"><option value="Рекомендация"><option value="Telegram"></datalist>`;
+}
+function issue(){const cl=K('client').filter(c=>!c.arch&&!rentOf('client',c.id)).sort((a,b)=>a.name.localeCompare(b.name,'ru')),bs=K('bike').filter(b=>bstat(b)=='free').sort((a,b)=>(a.num||'').localeCompare(b.num||'','ru'));
+if(IS.client=='new'&&!can('client_edit'))delete IS.client;
+if(!IS.term)Object.assign(IS,{term:'w',rates:{...S.cfg.renewal_rates},pay:'cash',date:TODAY()});
+return hd('Выдать велосипед')+`<div class=form id=issue-form>
+<label class=fld><span>Клиент</span><select id=ic onchange="isUpd()"><option value="">— выберите —</option>${can('client_edit')?`<option value="new" ${IS.client=='new'?'selected':''}>+ Новый клиент</option>`:''}${cl.map(c=>`<option value="${c.id}" ${IS.client==c.id?'selected':''}>${esc(c.name)}${c.black?' (чёрный список)':''}</option>`).join('')}</select></label>
+<div id=inew oninput="isUpd()" style="display:${IS.client=='new'?'block':'none'}"><label class=fld><span>ФИО</span><input id=inm value="${esc(IS.nm||'')}"></label><label class=fld><span>Телефон</span><input id=iph type=tel inputmode=tel placeholder="+7" value="${esc(IS.ph||'')}"></label>${sourceField('isrc',IS.src)}</div>
+<div id=iblk></div>
+<label class=fld><span>Электровелосипед</span><select id=ib onchange="isUpd()"><option value="">— выберите —</option>${bs.map(b=>`<option value="${b.id}" ${IS.bike==b.id?'selected':''}>${esc((b.num?b.num+' · ':'')+b.name)}</option>`).join('')}</select></label>
+${bs.length?'':'<div class=sub>Свободных велосипедов нет.</div>'}
+<label class=fld><span>Дата выдачи</span><input type=date id=idt value="${IS.date||TODAY()}" max="${TODAY()}" min="${addD(TODAY(),-60)}" required oninput="isUpd()"></label>
+<label class=fld><span>Номер договора</span><input id=icn value="${esc(IS.cn||'')}" oninput="isUpd()"></label>
+<div class=card style="margin:14px 0 0;padding:0"><label class=sw><span class=tx><b>Первый день бесплатно</b><span>Первый срок начнётся на следующий день после выдачи</span></span><input type=checkbox id=ifr ${IS.free?'checked':''} onchange="isUpd()"></label></div>
+<div class=fld><span>Первый срок</span>${seg('term',TERMS,IS.term)}</div>
+<details id=issue-rates class="fold rate-schedule" ${IS.showRates?'open':''} oninput="isUpd()" ontoggle="IS.showRates=this.open">
+<summary><span>${ic('right','s')}Цены продления</span></summary>
+${rateFields(IS.rates,true,true)}
+<label class=fld><span>Цена на первый срок, ₽</span><input type=number id=if min=1 step=0.01 inputmode=decimal value="${esc(IS.first||'')}"></label>
+</details>
+<div class=fld><span>Оплата</span>${seg('pay',[['cash','Наличные'],['transfer','Перевод'],['no','Оплатит позже']],IS.pay)}</div>
+<div class=pv id=ipv></div>
+<button class="btn blk lg" onclick="doIssue(this)">${ic('check','s')}Выдать</button></div>`}
+function issueSummary(draft){
+const days=LEN[draft.term],date=draft.date||TODAY(),start=addD(date,draft.free?1:0),end=addD(start,days-1);
+const gross=Number(draft.first||draft.rates[draft.term]),paid=draft.pay!='no';
+const discount=Math.min(gross,G('client',draft.client)?.discount?.amt||0),rate=moneyRound(gross-discount);
+return `<div class=sm>К оплате за первый срок</div><div class=big>${gross>=1?money2(rate):'—'}</div>
+${discount>0?kv('Разовая скидка',money2(discount)):''}
+${gross>=1?kv('В пересчёте на неделю',money2(rate*7/days)):''}
+${kv('Первый срок',`${fmt(start)} – ${fmt(end)}`)}
+${kv(paid?'Оплачено по':'Оплатить до',fmt(paid?end:date))}`;
+}
+function isUpd(){
+const form=$('#issue-form');if(!form)return;
+Object.assign(IS,{client:v('#ic'),bike:v('#ib'),nm:v('#inm'),ph:v('#iph'),src:v('#isrc'),first:v('#if'),cn:v('#icn'),
+    date:v('#idt'),free:$('#ifr').checked,term:segv(form,'term'),pay:segv(form,'pay'),rates:rateValues(form.querySelectorAll('[data-rate]'))});
+for(const caption of form.querySelectorAll('[data-weekly]')){
+    const key=caption.dataset.weekly;
+    caption.textContent=weeklyRate(IS.rates[key],key);
+}
+$('#inew').style.display=IS.client=='new'?'block':'none';
+const cc=G('client',IS.client);
+$('#iblk').innerHTML=cc&&cc.black?`<div class="note t-er" style="margin:10px 0 0">${ic('alert','s')}<div><b>Клиент в чёрном списке.</b>${cc.bnote?'<br>'+esc(cc.bnote):''}</div></div>`:'';
+const price=IS.rates[IS.term];$('#if').placeholder=price?'По тарифу '+money2(price):'';
+$('#ipv').innerHTML=issueSummary(IS)
+}
+async function doIssue(el){
+isUpd();
+if(!IS.client)return uiAlert('Выберите клиента');
+if(!IS.bike)return uiAlert('Выберите велосипед');
+if(IS.client=='new'&&!IS.nm.trim())return uiAlert('Укажите ФИО клиента');
+if(!$('#idt').reportValidity())return;
+const pricing=$('#issue-rates');
+const invalid=[...pricing.querySelectorAll('input')].find(input=>!input.checkValidity());
+if(invalid){pricing.open=true;invalid.reportValidity();return}
+const data={date:IS.date,client:IS.client,bike:IS.bike,term:IS.term,rates:IS.rates,first:IS.first,free:IS.free,method:IS.pay,contract:IS.cn};
+const cc=G('client',data.client);
+el.disabled=true;
+try{
+    if(cc?.black&&!await uiConfirm('Клиент в чёрном списке. Всё равно выдать?','Выдать'))return;
+    if(data.client=='new'){
+        const name=IS.nm.trim();
+        data.client=await saveClient({name,phone:IS.ph,src:IS.src});
+        const select=$('#ic');
+        if(select){select.add(new Option(name,data.client));select.value=data.client}
+        IS.client=data.client;
+        isUpd();
+    }
+    const initial=Number(data.first||data.rates[data.term]);
+    if(data.method!='no')data.expected=moneyRound(initial-Math.min(initial,cc?.discount?.amt||0));
+    const r=await act('issue',data);
+    hap('success');for(const k in IS)delete IS[k];await load();V=[['today'],['rent',r.id]];navDir='fw';render();toast('Велосипед выдан')
+}catch(e){if(e?.open){await load();V=[['more'],['client',e.open]];render()}else if(e!==ABORT)uiAlert(String(e))}
+finally{el.disabled=false}
+}
+/* ---------- Парк */
+function util(b,from,to){const own=[b.bought&&b.bought>from?b.bought:from,b.gone&&b.gone<to?b.gone:to];if(own[1]<own[0])return null;const tot=diff(own[1],own[0])+1;let busy=new Set();
+for(const r of K('rent').filter(r=>r.bike==b.id)){const a=(r.issued||r.start)>own[0]?(r.issued||r.start):own[0],z=(r.status=='active'?TODAY():(r.closed||r.issued))<own[1]?(r.status=='active'?TODAY():(r.closed||r.issued)):own[1];for(let d=a;d<=z;d=addD(d,1))busy.add(d)}
+return Math.round(busy.size/tot*100)}
+const loadingPercent=value=>value==null?'—':value+'%';
+function park(){const all=K('bike'),live=all.filter(b=>!['sold','off'].includes(b.status)),cnt=k=>live.filter(b=>bstat(b)==k).length,t=TODAY(),f30=addD(t,-29);
+let L=PF=='all'?live:PF=='arch'?all.filter(b=>['sold','off'].includes(b.status)):live.filter(b=>bstat(b)==PF);L.sort((a,b)=>(a.num||'').localeCompare(b.num||'','ru',{numeric:true}));
+if(PF=='arch')return hd('Архив велосипедов',`${L.length} в архиве`)+`<div class=seg>${[['all','Все'],['free','Свободны'],['rent','В аренде'],['repair','Ремонт'],['arch','Архив']].map(([k,n])=>`<button class="${PF==k?'on':''}" onclick="PF='${k}';render()">${n}</button>`).join('')}</div>`+archivedBikes(L);
+return hd('Парк',`${live.length} ${live.length==1?'велосипед':live.length<5?'велосипеда':'велосипедов'}`,can('bike_edit')?`<button class=ib onclick="bikeF()" aria-label="Добавить">${ic('plus')}</button>`:'')+
+`<div class=stt style="grid-template-columns:repeat(3,1fr)"><div><b>${cnt('free')}</b><span>свободно</span></div><div><b>${cnt('rent')}</b><span>в аренде</span></div><div><b>${cnt('repair')}</b><span>в ремонте</span></div></div>
+<div class=seg>${[['all','Все'],['free','Свободны'],['rent','В аренде'],['repair','Ремонт'],['arch','Архив']].map(([k,n])=>`<button class="${PF==k?'on':''}" onclick="PF='${k}';render()">${n}</button>`).join('')}</div>`+
+(L.length?`<div class=grp>${L.map(b=>{const s=bstat(b),r=b.rent&&G('rent',b.rent),u=util(b,f30,t);return `<button class=row onclick="go('bike','${b.id}')"><span class="gl ${BS[s][1]}">${ic('bike')}</span><span class=tx><b>${esc((b.num?b.num+' · ':'')+b.name)}</b><span>${r?esc(cname(r.client))+(r.waiting?'':' · до '+fmt(r.st.until).slice(0,5)):BS[s][0]}${u!=null&&!['sold','off'].includes(s)?` · загрузка ${u}%`:''}</span></span><span class=rt>${r?.waiting?chip('Ждёт возврата','t-bl'):chip(r&&r.st.late>0?'просрочка':BS[s][0],r&&r.st.late>0?'t-er':BS[s][1])}</span></button>`}).join('')}</div>`:`<div class=grp>${empty('Нет велосипедов','bike')}</div>`)}
+function archivedBikes(list){
+if(!list.length)return `<div class=grp>${empty('Архив велосипедов пуст','bike')}</div>`;
+const rows=list.slice().sort((a,b)=>(b.gone||'').localeCompare(a.gone||'')).map(b=>({b,p:fin()?bikePayback(b):null}));
+const summary=fin()?`<div class=card>${kv('Продано велосипедов',String(list.filter(b=>b.status=='sold').length))}${kv('Получено от продаж',money2(list.reduce((s,b)=>s+(b.sale?.amt||0),0)))}${kv('Прибыль за всё время',money2(rows.reduce((s,{p})=>s+p.stats.net,0)))}</div>`:'';
+return summary+`<div class=grp>${rows.map(({b,p})=>`<button class="row nl" onclick="go('bike','${b.id}')"><span class=tx><b>${esc((b.num?b.num+' · ':'')+b.name)}</b><span>${BS[b.status][0]}${b.gone?' · '+fmt(b.gone):''}${b.sale&&fin()?' · '+money2(b.sale.amt):''}</span>${p?`<span>Прибыль: ${money2(p.stats.net)}</span><span>${p.percent==null?'Укажите закупочную цену':p.balance>=0?'Сверх вложений '+money2(p.balance):'До окупаемости '+money2(-p.balance)}</span>`:''}</span><span class=rt>${p?`<b>${p.percent==null?'—':p.percent.toLocaleString('ru')+'%'}</b>`:ic('right','s')}</span></button>`).join('')}</div>`;
+}
+const cents=amount=>Math.round(Number(amount)*100);
+const moneyRound=amount=>cents(amount)/100;
+const moneySum=amounts=>amounts.reduce((sum,amount)=>sum+cents(amount),0)/100;
+function sbpCharges(payments){
+    const rates=S.cfg,fees={tax:0,acq:0,receipt:0},legacy=new Map();
+    let total=0;
+    for(const payment of payments){
+        const amount=cents(payment.amt);
+        total+=amount;
+        if(payment.fees){
+            for(const key of Object.keys(fees))fees[key]+=cents(payment.fees[key]);
+        }else{
+            const operation=payment.qr||payment;
+            legacy.set(operation,(legacy.get(operation)||0)+amount);
+        }
+    }
+    for(const amount of legacy.values()){
+        for(const key of Object.keys(fees)){
+            const rate=Math.round((rates[key]||0)*100);
+            fees[key]+=Math.round(amount*rate/10000);
+        }
+    }
+    return {qr:total/100,tax:fees.tax/100,acq:fees.acq/100,receipt:fees.receipt/100,
+            commissions:(fees.tax+fees.acq+fees.receipt)/100};
+}
+function financialDates(from,to){
+    const until=to&&to<TODAY()?to:TODAY();
+    return date=>typeof date=='string'&&date<=until&&(!from||date>=from);
+}
+function rentCash(rents,inPeriod){
+    let cash=0,transfer=0,ref=0,wo=0,inc=0;
+    const sbp=[],pays=[];
+    for(const rent of rents){
+        for(const payment of rent.pays||[]){
+            const date=payment.ts.slice(0,10);
+            if(!inPeriod(date))continue;
+            const amount=cents(payment.amt);
+            inc+=amount;
+            if(payment.method=='qr')sbp.push(payment);
+            else if(payment.method=='cash')cash+=amount;
+            else if(payment.method=='transfer')transfer+=amount;
+            pays.push({d:date,a:payment.amt});
+        }
+        if(rent.refund&&inPeriod(rent.refund.date)){
+            ref+=cents(rent.refund.amt);
+            pays.push({d:rent.refund.date,a:-rent.refund.amt});
+        }
+        if(rent.writeoff&&inPeriod(rent.closed))wo+=cents(rent.writeoff);
+    }
+    return {inc:inc/100,cash:cash/100,transfer:transfer/100,ref:ref/100,wo:wo/100,pays,...sbpCharges(sbp)};
+}
+function bstats(b,from,to){
+    const inPeriod=financialDates(from,to);
+    const received=rentCash(K('rent').filter(r=>r.bike==b.id),inPeriod);
+    const ex=moneySum(K('exp').filter(e=>e.bike==b.id&&inPeriod(e.date)).map(e=>e.amt));
+    const sale=b.sale&&inPeriod(b.sale.date)?b.sale.amt:0;
+    const {inc,ref,commissions}=received;
+    return {...received,ex,sale,net:moneySum([inc,sale,-ref,-commissions,-ex])};
+}
+function bikePayback(b){
+const stats=bstats(b);
+const invested=moneySum([b.cost||0,stats.ex,stats.commissions]);
+const received=moneySum([stats.inc,-stats.ref,stats.sale]);
+const balance=moneySum([received,-invested]);
+const percent=b.cost>0&&invested>0?Math.floor(cents(received)*10000/cents(invested))/100:null;
+return {stats,invested,received,balance,percent}
+}
+function bike(id){const b=G('bike',id);if(!b)return bk()+empty('Не найден');const s=bstat(b),r=b.rent&&G('rent',b.rent),t=TODAY();
+let h=bk()+`<div class=dh><div>${chip(BS[s][0],BS[s][1])}</div><h1>${esc(b.name)}</h1><div class=mu>${esc(b.num||'')}${b.vin?' · VIN '+esc(b.vin):''}</div></div>`;
+if(r)h+=`<div class=grp>${rentRow(r)}</div>`;
+if(fin()){const payback=bikePayback(b),a=payback.stats,pb=payback.percent;
+h+=`<div class=card><div class=sm>Окупаемость за всё время</div><div class=big>${pb==null?'—':pb.toLocaleString('ru')+'%'}</div>${pb!=null?`<div class=bars><div class=br style="grid-template-columns:1fr"><i><u style="width:${Math.min(100,Math.max(0,pb))}%;${payback.balance>=0?'background:var(--go)':''}"></u></i></div></div>`:''}
+<div class=sm>${pb==null?'Укажите закупочную цену':payback.balance>=0?`Окупился, сверх вложений ${money2(payback.balance)}`:`До окупаемости осталось ${money2(-payback.balance)}`}</div>
+${kv('Всего вложено',money2(payback.invested))}${kv('Поступления за всё время',money2(payback.received))}
+<div class="sm mu" style="margin-top:8px">Вложения — закупка, расходы на велосипед и комиссии (налоги, эквайринг, чеки). Поступления — аренда и продажа с вычетом возвратов клиентам.</div></div>
+<div class=card>${kv('Закупка',b.cost?m(b.cost):'—')}${kv('Куплен',b.bought?fmt(b.bought):'—')}${kv('Получено за аренду',m(a.inc))}${a.ref?kv('Возвраты клиентам','−'+m(a.ref)):''}${kv('Комиссии','−'+money2(a.commissions))}${kv('Расходы на велосипед','−'+m(a.ex))}${kv('Прибыль от аренды и продажи',m(a.net))}${kv('Результат с учётом закупки',money2(payback.balance))}${a.sale?kv('Продан за',m(a.sale)):''}${kv('Загрузка за 30 дней',loadingPercent(util(b,addD(t,-29),t)))}${kv('Загрузка за всё время',loadingPercent(b.bought?util(b,b.bought,t):null))}</div>`}
+else h+=`<div class=card>${kv('Куплен',b.bought?fmt(b.bought):'—')}</div>`;
+if(b.note)h+=`<div class="card sm">${tx2(b.note)}</div>`;
+const A=[];if(can('bike_edit'))A.push(`<button class="btn sec" onclick="bikeF('${id}')">${ic('edit','s')}Изменить</button>`);if(can('bike_status'))A.push(`<button class="btn sec" onclick="bstatS('${id}')">${ic('swap','s')}Статус</button>`);if(can('exp'))A.push(`<button class="btn sec" onclick="expF(null,'${id}')">${ic('receipt','s')}Расход</button>`);
+if(can('bike_status')&&!b.rent)A.push(`<button class="btn sec" onclick="bikeArchiveS('${id}')">${ic('box','s')}${['sold','off'].includes(b.status)?'Данные архива':'В архив / продать'}</button>`);
+if(A.length)h+=`<div class=acts>${A.join('')}</div>`;
+const RS=K('rent').filter(x=>x.bike==id).sort((a,b)=>(b.issued||'').localeCompare(a.issued||''));
+h+=`<h2 class=sec>Аренды</h2>`+(RS.length?`<div class=grp>${RS.map(x=>`<button class="row nl" onclick="go('rent','${x.id}')"><span class=tx><b>${esc(cname(x.client))}</b><span>${fmt(x.issued||x.start)} – ${x.status=='active'?'сейчас':fmt(x.closed||'')}${x.status=='seized'?' · изъят':''}</span></span><span class=rt><b>${m((x.pays||[]).reduce((a,p)=>a+p.amt,0))}</b></span></button>`).join('')}</div>`:`<div class=grp>${empty('Аренд ещё не было')}</div>`);
+const EX=K('exp').filter(e=>e.bike==id).sort((a,b)=>b.date.localeCompare(a.date));
+if(EX.length)h+=`<h2 class=sec>Расходы</h2><div class=grp>${EX.map(expRow).join('')}</div>`;
+return h}
+async function bikeF(id){const b=id?G('bike',id):{};await sheet(`<h3>${id?'Велосипед':'Новый велосипед'}</h3><div class=f2><label class=fld><span>Номер</span><input id=bn value="${esc(b.num||'')}" placeholder="B9"></label><label class=fld><span>VIN</span><input id=bv value="${esc(b.vin||'')}"></label></div>
+<label class=fld><span>Название</span><input id=bm value="${esc(b.name||'')}"></label>${fin()?`<div class=f2><label class=fld><span>Закупка, ₽</span><input id=bc type=number step=0.01 inputmode=decimal value="${b.cost||''}"></label><label class=fld><span>Дата покупки</span><input id=bd type=date value="${b.bought||''}"></label></div>`:''}
+<label class=fld><span>Заметка</span><textarea id=bt>${esc(b.note||'')}</textarea></label><button class="btn blk lg" data-y>Сохранить</button><button class="btn sec blk" data-n>Отмена</button>`,(o,d)=>{o.querySelector('[data-n]').onclick=()=>d();
+o.querySelector('[data-y]').onclick=async()=>{const q=s=>o.querySelector(s);try{const r=await act('bike',{id,v:b._v,num:q('#bn').value,vin:q('#bv').value,name:q('#bm').value,cost:q('#bc')?+q('#bc').value:undefined,bought:q('#bd')?q('#bd').value:undefined,note:q('#bt').value,point:b.point||''});d();await load();if(!id)go('bike',r.id);else render(true);toast('Сохранено')}catch(e){uiAlert(e)}}})}
+async function bstatS(id){const b=G('bike',id);if(b.rent)return uiAlert('Велосипед сейчас в аренде. Сначала оформите возврат.');
+const x=await uiPick('Статус велосипеда',['Свободен','В ремонте','Продан','Списан (кража, поломка)']);if(!x)return;
+if(x=='Продан'||x=='Списан (кража, поломка)')return bikeArchiveS(id,x=='Продан'?'sold':'off');
+if(b.sale&&!await uiConfirm('Велосипед вернётся в парк. Запись о продаже и её сумма будут удалены из отчётов.','Вернуть в парк'))return;
+doAct('bikestat',{id,status:x=='Свободен'?'free':'repair',v:b._v},'Статус изменён').catch(()=>{})}
+async function bikeArchiveS(id,selected){const b=G('bike',id);if(!b||b.rent)return uiAlert('Сначала завершите аренду велосипеда.');
+await sheet(`<h3>Архив велосипеда</h3><p>${esc(bfull(id))}</p><div class=fld><span>Причина</span>${seg('archive',[['sold','Продан'],['off','Списан']],selected||(['sold','off'].includes(b.status)?b.status:'sold'))}</div>
+<label class=fld data-sale><span>Стоимость продажи, ₽</span><input id=as type=number min=0 step=0.01 inputmode=decimal value="${b.sale?.amt??''}"></label><label class=fld><span>Дата</span><input id=ad type=date max="${TODAY()}" value="${b.sale?.date||b.gone||TODAY()}"></label><p>Продажа учитывается в прибыли месяца по этой дате и в окупаемости велосипеда. Вся история сохраняется.</p>
+<button class="btn blk lg" data-y>Сохранить в архиве</button><button class="btn sec blk" data-n>Отмена</button>`,(o,d)=>{const upd=()=>o.querySelector('[data-sale]').style.display=segv(o,'archive')=='sold'?'':'none';wireSeg(o,upd);upd();o.querySelector('[data-n]').onclick=()=>d();
+o.querySelector('[data-y]').onclick=async()=>{const y=o.querySelector('[data-y]'),status=segv(o,'archive'),value=o.querySelector('#as').value;if(status=='sold'&&!value.trim())return uiAlert('Укажите стоимость продажи.');y.disabled=true;try{await doAct('bikestat',{id,status,amt:status=='sold'?+value:0,date:o.querySelector('#ad').value,v:b._v},'Велосипед в архиве');d()}catch{}finally{y.disabled=false}}})}
+/* ---------- Клиенты */
+function clients(){const L=K('client').filter(c=>!c.arch).filter(c=>!QS||(c.name+' '+(c.phone||'')).toLowerCase().includes(QS.toLowerCase())).sort((a,b)=>a.name.localeCompare(b.name,'ru'));
+return bk()+hd('Клиенты',`${K('client').filter(c=>!c.arch).length}`,can('client_edit')?`<button class=ib onclick="clientF()" aria-label="Добавить">${ic('plus')}</button>`:'')+`<div class=srch>${ic('search','s')}<input id=qs placeholder="Поиск по имени или телефону" value="${esc(QS)}" oninput="QS=this.value;clearTimeout(window.qst);window.qst=setTimeout(()=>{render(true);const e=$('#qs');e.focus();e.setSelectionRange(e.value.length,e.value.length)},250)"></div>`+
+`<div class=acts style="margin-top:0"><button class="btn sec" onclick="go('carch')">${ic('box','s')}Архив клиентов · ${K('client').filter(c=>c.arch&&!c.purged).length}</button></div>`+(L.length?`<div class=grp>${L.map(c=>{const r=rentOf('client',c.id),debt=K('rent').filter(x=>x.client==c.id&&x.status!='active').reduce((a,x)=>a+(x.debt||0),0);return `<button class=row onclick="go('client','${c.id}')"><span class="av ${r?'t-bl':''}">${esc(ini(c.name))}</span><span class=tx><b>${esc(c.name)}</b><span>${esc(c.phone||'')}${r?' · '+esc(bnum(r.bike)):''}</span></span><span class=rt>${c.black?chip('чёрный список','t-er'):''}${debt?chip('долг '+m(debt),'t-er'):r?chip('аренда','t-bl'):''}</span></button>`}).join('')}</div>`:`<div class=grp>${empty('Никого не нашли','users')}</div>`)}
+let QA='';
+function carch(){const A=K('client').filter(c=>c.arch&&!c.purged),L=A.filter(c=>!QA||(c.name+' '+(c.phone||'')).toLowerCase().includes(QA.toLowerCase())).sort((a,b)=>(b.arch||'').localeCompare(a.arch||''));
+return bk()+hd('Архив клиентов',`${A.length}`)+`<div class=srch>${ic('search','s')}<input id=qa placeholder="Поиск по имени или телефону" value="${esc(QA)}" oninput="QA=this.value;clearTimeout(window.qat);window.qat=setTimeout(()=>{render(true);const e=$('#qa');e.focus();e.setSelectionRange(e.value.length,e.value.length)},250)"></div>
+<div class=sub style="margin:0 22px 8px">Сюда попадают клиенты, которых вы убрали вручную${S.cfg.archdays>0?', и те, у кого не было аренды '+S.cfg.archdays+' '+dayWord(S.cfg.archdays):''}. Их нельзя выбрать при выдаче, вход у них сброшен. Платежи и аренды сохраняются.</div>`+
+(L.length?`<div class=grp>${L.map(c=>`<button class=row onclick="go('client','${c.id}')"><span class=av>${esc(ini(c.name))}</span><span class=tx><b>${esc(c.name)}</b><span>${esc(c.phone||'')} · в архиве с ${fmt(c.arch)}${c.archwhy=='auto'?' (авто)':''}</span></span></button>`).join('')}</div>`:`<div class=grp>${empty(A.length?'Никого не нашли':'Архив пуст','users')}</div>`)}
+async function archS(id){const c=G('client',id);if(rentOf('client',id))return uiAlert('Сначала завершите аренду клиента.');
+if(!await uiConfirm('Клиент пропадёт из списка и из выбора при выдаче. Вход в приложение у него сбросится. Аренды и платежи сохранятся. Вернуть можно из архива.','В архив',{title:'Отправить в архив?'}))return;doAct('archive',{id},'Клиент в архиве').catch(()=>{})}
+async function unarchS(id){if(await uiConfirm('Клиент снова появится в списке и при выдаче. Для входа понадобится новая ссылка или QR.','Вернуть',{title:'Вернуть из архива?'}))doAct('unarchive',{id},'Клиент возвращён').catch(()=>{})}
+async function purgeS(id){const c=G('client',id);await sheet(`<h3>Удалить навсегда?</h3><p>Сотрутся ФИО, телефон, @ник, договор и заметки, в том числе из журнала. В истории аренд и платежей останется «Удалённый клиент», чтобы не изменились отчёты. <b>Восстановить будет нельзя.</b></p>
+<label class=fld><span>Для подтверждения напишите УДАЛИТЬ</span><input id=pc autocomplete=off></label><button class="btn dng blk lg" data-y>Удалить навсегда</button><button class="btn sec blk" data-n>Отмена</button>`,(o,d)=>{o.querySelector('[data-n]').onclick=()=>d();
+o.querySelector('[data-y]').onclick=async()=>{const v=o.querySelector('#pc').value.trim().toUpperCase();if(v!='УДАЛИТЬ')return toast('Напишите УДАЛИТЬ');try{await act('purge',{id,confirm:v});d();hap('success');toast('Клиент удалён');await load();V.pop();render()}catch(e){uiAlert(e)}}})}
+async function saveClient(b){const r=await fetch('/api/act',{method:'POST',headers:{'X-Init':T.initData||'','Content-Type':'application/json'},body:JSON.stringify({a:'client',...b})});let j={};try{j=await r.json()}catch(e){}
+if(r.ok)return j.id;if(r.status!=409)throw j.err||'код '+r.status;
+let res=null;await sheet(`<h3>Такой номер уже есть</h3><p>${esc(j.err)}</p><button class="btn blk lg" data-o>Открыть его карточку</button><button class="btn sec blk" data-f>Всё равно создать</button><button class="btn sec blk" data-n>Отмена</button>`,(o,d)=>{
+o.querySelector('[data-o]').onclick=()=>{res={open:j.dup};d()};o.querySelector('[data-f]').onclick=()=>{res={force:1};d()};o.querySelector('[data-n]').onclick=()=>d()});
+if(!res)throw ABORT;if(res.open)throw {open:res.open};return saveClient({...b,force:true})}
+function discountCard(c){return `<div class="card t-ok"><b>Скидка ${money2(c.discount.amt)} на следующую оплату</b>${c.discount.note?`<div class=sm>${tx2(c.discount.note)}</div>`:''}<div class=sm>Применится один раз к выбранному сроку аренды. Тариф после оплаты останется прежним.</div>${isOwner()?`<button class="btn sec blk" style="margin-top:10px" onclick="discountS('${c.id}')">Изменить скидку</button>`:''}</div>`}
+async function discountS(cid){const c=G('client',cid);if(!isOwner()||!c)return;
+await sheet(`<h3>Скидка на следующую оплату</h3><p>${esc(c.name)}</p><label class=fld><span>Скидка, ₽</span><input id=ds type=number min=0.01 step=0.01 inputmode=decimal value="${c.discount?.amt||''}" placeholder="700"></label><label class=fld><span>Внутренняя заметка</span><input id=dn value="${esc(c.discount?.note||'')}" placeholder="Например: привёл нового клиента"></label><p>Скидка действует один раз на любой выбранный срок, максимум до стоимости аренды. Долг и неустойку не уменьшает. Неиспользованный остаток не переносится. Новая скидка заменяет предыдущую.</p>
+<button class="btn blk lg" data-y>Отправить скидку</button>${c.discount?'<button class="btn dng blk" data-remove>Отменить скидку</button>':''}<button class="btn sec blk" data-n>Закрыть</button>`,(o,d)=>{o.querySelector('[data-n]').onclick=()=>d();const save=async amt=>{const y=o.querySelector('[data-y]');y.disabled=true;try{await doAct('discount',{id:cid,amt,note:o.querySelector('#dn').value,v:c._v},amt?'Скидка отправлена':'Скидка отменена');d()}catch{}finally{y.disabled=false}};
+o.querySelector('[data-y]').onclick=()=>{const amount=+o.querySelector('#ds').value;if(!Number.isFinite(amount)||amount<=0)return uiAlert('Укажите положительную сумму скидки.');return save(amount)};const remove=o.querySelector('[data-remove]');if(remove)remove.onclick=()=>save(0)})}
+function clientAccess(id){
+const c=G('client',id);
+if(!can('client_access')||!c||c.arch||c.purged)return '';
+return `<details class="fold client-access"><summary class=card><span>${ic('right','s')}Доступ</span></summary>
+<div class=acts><button class=btn onclick="loginQR('${id}')">${ic('qr','s')}QR для входа</button><button class="btn sec" onclick="invite('${id}')">${ic('link','s')}Ссылка для входа</button><button class="btn sec" onclick="unbind('${id}')">${ic('x','s')}Сбросить вход</button></div></details>`
+}
+function client(id){const c=G('client',id);if(!c)return bk()+empty('Не найден');const r=rentOf('client',id),RS=K('rent').filter(x=>x.client==id).sort((a,b)=>(b.issued||'').localeCompare(a.issued||'')),debt=RS.filter(x=>x.status!='active').reduce((a,x)=>a+(x.debt||0),0);
+let h=bk()+`<div class=dh><div>${c.black?chip('чёрный список','t-er'):''}</div><h1>${esc(c.name)}</h1><div class=ph>${esc(c.phone||'')}</div>
+${c.tgu?`<div class=mu style="margin-top:4px">Telegram: <a href="#" onclick="T.openTelegramLink('https://t.me/${esc(c.tgu)}');return false">@${esc(c.tgu)}</a></div>`:''}
+<div class=acts>${c.phone?`<a class="btn sec" href="tel:${esc(c.phone)}">${ic('phone','s')}Позвонить</a>`:''}${c.tgu?`<button class="btn sec" onclick="T.openTelegramLink('https://t.me/${esc(c.tgu)}')">${ic('send','s')}Написать</button>`:''}</div>
+</div>`;
+h+=clientAccess(id);
+if(c.discount)h+=discountCard(c);
+else if(isOwner()&&!c.purged)h+=`<div class=acts><button class="btn sec" onclick="discountS('${id}')">${ic('receipt','s')}Скидка на следующую оплату</button></div>`;
+if(c.black&&c.bnote)h+=`<div class="note t-er">${ic('alert','s')}<div>${tx2(c.bnote)}</div></div>`;
+if(debt)h+=`<div class="note t-er">${ic('alert','s')}<div><b>Долг ${m(debt)}</b> по закрытым арендам</div></div>`;
+if(r)h+=`<h2 class=sec>Текущая аренда</h2><div class=grp>${rentRow(r)}</div>`;
+h+=`<div class=card>${kv('Договор',esc(c.contract||'—')+(c.cdate?' от '+fmt(c.cdate):''))}${kv('Откуда пришёл',esc(c.src||'—'))}${kv('Всего оплатил',m(RS.reduce((a,x)=>a+(x.pays||[]).reduce((s,p)=>s+p.amt,0),0)))}</div>`;
+if(c.note)h+=`<div class="card sm">${tx2(c.note)}</div>`;
+if(c.arch)h=h.replace('<div class=dh><div>','<div class=dh><div>'+chip('в архиве с '+fmt(c.arch),'t-n')+' ');
+const actions=[];
+if(c.arch){
+    if(can('client_archive'))actions.push(`<button class=btn onclick="unarchS('${id}')">${ic('swap','s')}Вернуть из архива</button>`);
+    if(isOwner())actions.push(`<button class="btn dng" onclick="purgeS('${id}')">${ic('trash','s')}Удалить навсегда</button>`);
+}else{
+    if(can('client_edit'))actions.push(`<button class="btn sec" onclick="clientF('${id}')">${ic('edit','s')}Изменить</button>`);
+    if(can('client_archive')&&!r)actions.push(`<button class="btn sec" onclick="archS('${id}')">${ic('box','s')}В архив</button>`);
+    if(can('client_block'))actions.push(`<button class="btn ${c.black?'sec':'dng'}" onclick="blackS('${id}')">${ic('flag','s')}${c.black?'Убрать из чёрного списка':'В чёрный список'}</button>`);
+}
+if(actions.length)h+=`<div class=acts>${actions.join('')}</div>`;
+h+=`<h2 class=sec>История аренд</h2>`+(RS.length?`<div class=grp>${RS.map(x=>`<button class="row nl" onclick="go('rent','${x.id}')"><span class=tx><b>${esc(bfull(x.bike))}</b><span>${fmt(x.issued||x.start)} – ${x.status=='active'?'сейчас':fmt(x.closed||'')}${x.status=='seized'?' · изъят':''}${x.debt?' · долг '+m(x.debt):''}</span></span><span class=rt><b>${m((x.pays||[]).reduce((a,p)=>a+p.amt,0))}</b></span></button>`).join('')}</div>`:`<div class=grp>${empty('Аренд ещё не было')}</div>`);
+return h+paymentDisciplinePanel(RS)}
+async function clientF(id){const c=id?G('client',id):{};await sheet(`<h3>${id?'Клиент':'Новый клиент'}</h3><label class=fld><span>ФИО</span><input id=cn value="${esc(c.name||'')}"></label><label class=fld><span>Телефон</span><input id=cp type=tel inputmode=tel value="${esc(c.phone||'')}" placeholder="+7"></label>
+<div class=f2><label class=fld><span>Договор №</span><input id=cc value="${esc(c.contract||'')}"></label><label class=fld><span>Дата договора</span><input id=cd type=date value="${esc(c.cdate||'')}"></label></div>
+${sourceField('cs',c.src)}<label class=fld><span>Заметка</span><textarea id=ct>${esc(c.note||'')}</textarea></label>
+<button class="btn blk lg" data-y>Сохранить</button><button class="btn sec blk" data-n>Отмена</button>`,(o,d)=>{o.querySelector('[data-n]').onclick=()=>d();
+o.querySelector('[data-y]').onclick=async()=>{const q=s=>o.querySelector(s).value;try{const nid_=await saveClient({id,v:c._v,name:q('#cn'),phone:q('#cp'),contract:q('#cc'),cdate:q('#cd'),src:q('#cs'),note:q('#ct')});d();await load();if(!id)go('client',nid_);else render(true);toast('Сохранено')}catch(e){if(e&&e.open){d();await load();go('client',e.open)}else if(e!==ABORT)uiAlert(e)}}})}
+async function blackS(id){const c=G('client',id);if(c.black){if(await uiConfirm('Убрать клиента из чёрного списка?','Убрать'))doAct('black',{id,on:false},'Готово').catch(()=>{});return}
+await sheet(`<h3>В чёрный список</h3><p>При новой выдаче приложение предупредит.</p><label class=fld><span>Причина</span><textarea id=bn></textarea></label><button class="btn dng blk" data-y>Добавить</button><button class="btn sec blk" data-n>Отмена</button>`,(o,d)=>{o.querySelector('[data-n]').onclick=()=>d();o.querySelector('[data-y]').onclick=()=>doAct('black',{id,on:true,note:o.querySelector('#bn').value},'Добавлен в чёрный список').finally(()=>d()).catch(()=>{})})}
+async function invite(cid){try{const r=await api('/api/invite',{client:cid}),link=`https://t.me/${r.bot}?startapp=${r.tok}`;
+await sheet(`<h3>Ссылка для входа</h3><p>Действует 7 дней, один раз. При входе спросим номер телефона из карточки.</p><input id=lk readonly value="${esc(link)}"><button class="btn blk" data-c>${ic('copy','s')}Скопировать</button><button class="btn sec blk" data-s>${ic('send','s')}Отправить в Telegram</button><button class="btn sec blk" data-x>Закрыть</button>`,(o,d)=>{
+o.querySelector('[data-x]').onclick=()=>d();o.querySelector('[data-s]').onclick=()=>T.openTelegramLink('https://t.me/share/url?url='+encodeURIComponent(link));
+o.querySelector('[data-c]').onclick=async()=>{try{await navigator.clipboard.writeText(link);toast('Ссылка скопирована')}catch(e){o.querySelector('#lk').select()}}},null)}catch(e){uiAlert('Не удалось создать ссылку: '+e)}}
+async function loginQR(cid){try{const r=await api('/api/invite',{client:cid,qr:true}),link=`https://t.me/${r.bot}?startapp=${r.tok}`;
+await sheet(`<h3>QR для входа</h3><p>Попросите клиента навести камеру телефона на код. Откроется приложение, и он сразу войдёт в свой аккаунт. Код действует 10 минут и срабатывает один раз.</p><div style="margin:6px 0 18px">${QR.svg(link,264)}</div><button class="btn sec blk" data-x>Готово</button>`,(o,d)=>{o.querySelector('[data-x]').onclick=()=>d()},null)}catch(e){uiAlert('Не удалось создать QR: '+e)}}
+async function unbind(cid){if(await uiConfirm('Клиенту понадобится новая ссылка для входа.','Сбросить',{title:'Сбросить вход?'})){await api('/api/unbind',{client:cid});toast('Вход сброшен')}}
+/* ---------- Финансы */
+const MN=['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'];
+function range(){const t=TODAY();if(FIN.mode=='all')return [null,null,'Всё время'];
+if(FIN.mode=='y'){const y=+t.slice(0,4)+FIN.off;return [`${y}-01-01`,`${y}-12-31`,String(y)]}
+const d=new Date(t.slice(0,7)+'-01T00:00:00Z');d.setUTCMonth(d.getUTCMonth()+FIN.off);const a=d.toISOString().slice(0,10);d.setUTCMonth(d.getUTCMonth()+1);d.setUTCDate(0);
+const z=d.toISOString().slice(0,10);return [a,z,`${MN[+a.slice(5,7)-1]} ${a.slice(0,4)}`]}
+function money(from,to){
+    const inPeriod=financialDates(from,to);
+    const received=rentCash(K('rent'),inPeriod),{inc,ref,commissions,pays}=received;
+    const ex=K('exp').filter(e=>inPeriod(e.date));
+    const expensesTotal=moneySum([ref,commissions,...ex.map(e=>e.amt)]);
+    const bikes=K('bike');
+    const buy=moneySum(bikes.filter(b=>inPeriod(b.bought)||(!from&&!to&&!b.bought)).map(b=>b.cost||0));
+    const sales=bikes.filter(b=>b.sale&&inPeriod(b.sale.date));
+    const sale=moneySum(sales.map(b=>b.sale.amt));
+    for(const b of sales)pays.push({d:b.sale.date,a:b.sale.amt});
+    const review=moneySum(K('unk').filter(u=>u.status=='open'&&inPeriod(u.ts.slice(0,10))).map(u=>u.amt));
+    const net=moneySum([inc,sale,-expensesTotal]);
+    return {...received,ex,expensesTotal,net,cashflow:moneySum([net,-buy]),buy,sale,saleCount:sales.length,review};
+}
+function bars(rows,fmtv=m){const mx=Math.max(1,...rows.map(r=>Math.abs(r[1])));return `<div class=bars>${rows.map(([l,v,on])=>`<div class=br ${on?`onclick="${on}" style="cursor:pointer"`:''}><span>${esc(l)}</span><i><u style="width:${Math.abs(v)/mx*100}%;${v<0?"background:var(--er)":""}"></u></i><b>${fmtv(v)}</b></div>`).join('')}</div>`}
+function finS(){
+const tabs=[];
+if(fin())tabs.push(['stats','Статистика',statistics],['an','Аналитика',analytics]);
+if(can('exp')||fin())tabs.push(['ex','Расходы',expenses]);
+const selected=tabs.find(([k])=>k==FT)||tabs[0];
+FT=selected[0];
+return hd('Финансы')+`<div class=seg>${tabs.map(([k,n])=>`<button class="${FT==k?'on':''}" onclick="FT='${k}';render()">${n}</button>`).join('')}</div>`+selected[2]()
+}
+function statistics(){const[a,z,lbl]=range(),M=money(a,z);
+const cats=new Map();
+for(const e of M.ex)cats.set(e.cat,(cats.get(e.cat)||0)+e.amt);
+const costs=[['Комиссии',M.commissions]];
+costs.push(...[...cats].sort((x,y)=>y[1]-x[1]));
+if(M.ref)costs.push(['Возвраты клиентам',M.ref]);
+let h=`<div class=seg>${[['m','Месяц'],['y','Год'],['all','Всё время']].map(([k,n])=>`<button class="${FIN.mode==k?'on':''}" onclick="FIN={mode:'${k}',off:0};render()">${n}</button>`).join('')}</div>`;
+if(FIN.mode!='all')h+=`<div style="display:flex;align-items:center;justify-content:space-between;margin:4px 16px"><button class=ib onclick="FIN.off--;render()">${ic('left')}</button><b style="font-size:18px">${esc(lbl)}</b><button class=ib onclick="FIN.off++;render()" ${FIN.off>=0?'disabled style="opacity:.3"':''}>${ic('right')}</button></div>`;
+h+=`<div class="card tint"><div class=sm>Прибыль от аренды и продаж</div><div class=big style="color:${M.net<0?'var(--ert)':'var(--pine)'}">${m(M.net)}</div><div class=sm>поступления от аренды и продажи за вычетом комиссий, возвратов и текущих расходов</div></div>
+<div class=card>${kv('Получено всего',money2(M.inc+M.sale))}${M.saleCount?kv('Продажа электро.',money2(M.sale)):''}${kv('Аренда по СБП',money2(M.qr))}${kv('Аренда переводом',money2(M.transfer))}${kv('Аренда наличными',money2(M.cash))}
+<details class="fold fin-exp"><summary class=kv><span>${ic('right','s')}Расходы</span><b>${M.expensesTotal?'−':''}${money2(M.expensesTotal)}</b></summary>
+<div class=fin-detail>${costs.map(([k,v])=>kv(k,money2(v))).join('')}</div></details>${kv('Прибыль от аренды и продаж',money2(M.net))}</div>
+${M.review?`<div class=card>${kv('Поступления по СБП на проверке',money2(M.review))}<div class=sm>Войдёт в прибыль после зачёта платежей.</div></div>`:''}<div class=card>${kv('Закупка велосипедов',m(M.buy))}${kv('Результат с учётом закупки',money2(M.cashflow))}${M.wo?kv('Недополучено (изъятия)',m(M.wo)):''}</div>`;
+let rows=[];if(FIN.mode!='m'){const ys=FIN.mode=='y'?[a.slice(0,4)]:[...new Set(M.pays.map(p=>p.d.slice(0,4)))].sort();for(const y of ys)for(let k=1;k<=12;k++){const p=`${y}-${String(k).padStart(2,'0')}`;if(p>TODAY().slice(0,7))break;const v=M.pays.filter(x=>x.d.startsWith(p)).reduce((s,x)=>s+x.a,0);if(FIN.mode=='all'&&!v&&!rows.length)continue;
+const off=(+y-+TODAY().slice(0,4))*12+k-+TODAY().slice(5,7);rows.push([`${MN[k-1].slice(0,3)}${FIN.mode=='all'?' '+y.slice(2):''}`,v,`FIN={mode:'m',off:${off}};render()`])}}
+if(FIN.mode!='m')h+=`<h2 class=sec>Поступления за вычетом возвратов по месяцам</h2><div class=card>${rows.length?bars(rows):empty('Нет данных')}</div>`;
+const bl=K('bike').map(b=>({b,s:bstats(b,a,z),payback:bikePayback(b)})).filter(x=>x.s.inc||x.s.ex||x.s.sale||x.s.ref||!['sold','off'].includes(x.b.status)).sort((x,y)=>(y.payback.percent??-1e9)-(x.payback.percent??-1e9));
+h+=`<h2 class=sec>Окупаемость велосипедов</h2><div class=grp>${bl.map(({b,s,payback})=>`<button class="row nl" onclick="go('bike','${b.id}')"><span class=tx><b>${esc((b.num?b.num+' · ':'')+b.name)}</b><span>прибыль ${FIN.mode=='all'?'за всё время':'за '+esc(lbl)}: ${m(s.net)}</span><span>${payback.percent==null?'Укажите закупочную цену':payback.balance>=0?'Сверх вложений '+money2(payback.balance):'До окупаемости '+money2(-payback.balance)}</span></span><span class=rt><b style="font-size:19px;${payback.percent!=null&&payback.balance>=0?'color:var(--go)':''}">${payback.percent==null?'—':payback.percent.toLocaleString('ru')+'%'}</b></span></button>`).join('')}</div>`;
+const gen=M.ex.filter(e=>!e.bike).reduce((s,e)=>s+e.amt,0);if(gen)h+=`<div class=sub>Общие расходы без привязки к велосипеду: ${m(gen)}. Они входят в общий итог.</div>`;
+const undated=K('bike').filter(b=>b.cost&&!b.bought).reduce((sum,b)=>sum+b.cost,0);
+if(undated)h+=`<div class=sub>У велосипедов на ${money2(undated)} не указана дата закупки: она учитывается в окупаемости и за всё время. Для отчётов по месяцам укажите дату покупки.</div>`;
+return h}
+function analysisDate(raw){
+const date=String(raw||'').slice(0,10);
+if(!/^\d{4}-\d{2}-\d{2}$/.test(date))return '';
+const parsed=new Date(date+'T00:00:00Z');
+return Number.isFinite(+parsed)&&parsed.toISOString().slice(0,10)==date?date:'';
+}
+const SOURCE_NAMES=new Map([
+    ['авито','Авито'],['avito','Авито'],
+    ['рекомендация','Рекомендация'],['рекомендации','Рекомендация'],['знакомые','Рекомендация'],['сарафан','Рекомендация'],
+    ['telegram','Telegram'],['телеграм','Telegram'],['тг','Telegram']
+]);
+function paymentDiscipline(rents){
+const result={known:0,onTime:0,late:0,lateDays:0,maxLate:0,unknown:0,partial:0,free:0,currentLate:0,last:''};
+for(const r of rents){
+ if(r.status=='active')result.currentLate=Math.max(result.currentLate,LATE(r.st||{}));
+ for(const p of r.pays||[]){
+  const date=analysisDate(p.ts);if(!date||date>TODAY())continue;
+  if(p.amt>0&&date>result.last)result.last=date;
+  if(!(p.n>0))continue;
+  if(!(p.amt>0)){result.free++;continue}
+  if(p.kind=='part'){result.partial++;continue}
+  const due=analysisDate(p.due);
+  if(!due){result.unknown++;continue}
+  const late=Math.max(0,diff(date,due));result.known++;
+  if(late){result.late++;result.lateDays+=late;result.maxLate=Math.max(result.maxLate,late)}else result.onTime++;
+ }
+}
+return result;
+}
+function paymentDisciplinePanel(rents){const p=paymentDiscipline(rents),percent=p.known?Math.round(100*p.onTime/p.known):null;
+return `<h2 class=sec>Платёжная дисциплина</h2><div class="card payment-discipline">${p.known?`${kv('Полных оплат с известным сроком',String(p.known))}${kv('В срок или заранее',p.onTime+' · '+percent+'%')}${kv('С опозданием',String(p.late))}${p.late?`${kv('Среднее опоздание',(p.lateDays/p.late).toLocaleString('ru',{maximumFractionDigits:1})+' дн.')}${kv('Максимальное опоздание',p.maxLate+' '+dayWord(p.maxLate))}`:''}`:`<div class="sm mu">Пока нет полных оплат с сохранённым сроком платежа.</div>`}${p.partial?kv('Частичных оплат',String(p.partial)):''}${p.free?kv('Периодов полностью за скидку',String(p.free)):''}${p.unknown?kv('Оплат без сохранённого срока',String(p.unknown)):''}${p.last?kv('Последняя оплата',fmt(p.last)):''}${p.currentLate?kv('Текущая просрочка',p.currentLate+' '+dayWord(p.currentLate)):''}</div><div class=sub>В срок или с опозданием оцениваются полные платежи. Частичные оплаты и старые платежи без сохранённого срока показаны отдельно.</div>`;
+}
+let forecastDays=7;
+function receiptForecast(){const f=S?.forecast;
+if(!f)return `<h2 class=sec>Прогноз поступлений</h2><div class=card>${empty('Прогноз появится после обновления данных','cal')}</div>`;
+const end=addD(f.from,forecastDays-1),rows=f.rows.filter(x=>x.date<=end),groups=new Map();
+for(const row of rows){if(!groups.has(row.date))groups.set(row.date,[]);groups.get(row.date).push(row)}
+return `<h2 class=sec>Прогноз поступлений</h2><div class=stt style="grid-template-columns:repeat(2,1fr)"><div><b>${money2(f.total7)}</b><span>ближайшие 7 дней</span></div><div><b>${money2(f.total30)}</b><span>ближайшие 30 дней</span></div></div>
+<div class=sub>С ${fmt(f.from)}. По базовым тарифам действующих аренд, с учётом разовой скидки и планируемого возврата. Продление аренды предполагается. Суммы до комиссий; будущая неустойка и новые выдачи не включены.</div>
+${f.overdue||f.closed_debt?`<div class=card>${f.overdue?kv('Уже прошёл срок оплаты',money2(f.overdue)):''}${f.closed_debt?kv('Долги по закрытым арендам',money2(f.closed_debt)):''}<div class="sm mu">Эти суммы не включены в прогноз будущих поступлений.</div></div>`:''}
+<div class=seg>${[7,30].map(days=>`<button class="${forecastDays==days?'on':''}" onclick="forecastDays=${days};render(true)">${days} дней</button>`).join('')}</div>
+<details class="fold forecast-payments"><summary class=card><span>Платежи по дням</span><b>${rows.length}</b></summary>${rows.length?[...groups].map(([date,list])=>`<h3 class=sec>${fmt(date)} · ${money2(list.reduce((sum,x)=>sum+x.amt,0))}</h3><div class=grp>${list.map(x=>`<button class=row onclick="go('rent','${x.rent}')"><span class=tx><b>${esc(x.client)}</b><span>${esc(x.bike)} · ${x.kind=='debt'?'доплата долга':'аренда'}</span></span><span class=rt><b>${money2(x.amt)}</b></span></button>`).join('')}</div>`).join(''):`<div class=grp>${empty('Платежей по графику в этом периоде нет','receipt')}</div>`}</details>${f.skipped?`<div class=sub>Для ${f.skipped} ${plural(f.skipped,'аренды','аренд','аренд')} не хватает данных для прогноза.</div>`:''}`;
+}
+function outcomeRow(label,stats){
+const renewal=stats.eligible?`<b>${Math.round(100*stats.renewed/stats.eligible)}%</b><small>${stats.renewed} из ${stats.eligible}</small>`:'—';
+const duration=stats.completed?`<b>${(stats.days/stats.completed).toLocaleString('ru',{maximumFractionDigits:1})} дн.</b><small>${stats.completed} ${plural(stats.completed,'аренда','аренды','аренд')}</small>`:'—';
+return `<tr><th scope=row>${label}</th><td>${renewal}</td><td>${duration}</td></tr>`;
+}
+function paymentAnalytics(year){
+const groups=new Map([...TERMS,['other','Другие / старые сроки']].map(([key,label])=>[key,{label,count:0,amt:0,clients:new Set()}]));
+const methods=new Map(),timing={known:0,onTime:0,late:0,maxLate:0};let total=0;
+for(const r of K('rent')){let k=(r.base||0)+1;
+for(const p of r.pays||[]){const date=analysisDate(p.ts),period=k;k+=p.n||0;
+if(!date||date>TODAY()||Number(date.slice(0,4))!=year)continue;
+if(p.amt>0)methods.set(p.method,(methods.get(p.method)||0)+p.amt);
+if(!(p.n>0))continue;
+let key=p.term;
+if(!key){
+    const basis=j=>j==1&&r.initial?r.initial.term:(r.plan||[]).filter(x=>x.k<=j).at(-1)?.type||r.type;
+    const types=new Set(Array.from({length:Math.min(p.n,400)},(_,i)=>basis(period+i)));
+    const base=p.period_type||(types.size==1?[...types][0]:null),days=(LEN[base]||0)*p.n;
+    key=[...groups.keys()].find(t=>LEN[t]==days)||'other';
+}
+const group=groups.get(key)||groups.get('other');group.count++;group.amt+=p.amt||0;group.clients.add(r.client);total++;
+const due=analysisDate(p.due);
+if(due&&p.amt>0&&p.kind!='part'){const late=Math.max(0,diff(date,due));timing.known++;if(late){timing.late++;timing.maxLate=Math.max(timing.maxLate,late)}else timing.onTime++}
+}}
+const rows=[...groups.values()].filter(x=>x.count);
+return `<h2 class=sec>Как платят клиенты · ${year}</h2><div class=card>${rows.length?`<table class=rental-outcomes><thead><tr><th scope=col>Срок оплаты</th><th scope=col>Платежи</th><th scope=col>Оплачено</th></tr></thead><tbody>${rows.map(x=>`<tr><th scope=row>${x.label}<small style="display:block;font-weight:400">${x.clients.size} ${plural(x.clients.size,'клиент','клиента','клиентов')}</small></th><td><b>${x.count}</b><small>${Math.round(100*x.count/total)}%</small></td><td>${money2(x.amt)}</td></tr>`).join('')}</tbody></table>`:empty('Платежей за выбранный год нет','receipt')}</div>
+<div class=sub>Каждая оплата срока считается один раз, включая продления. Доплаты долга не считаются новым выбором срока. В суммах учтены фактические оплаты после скидок.</div>
+${methods.size?`<h2 class=sec>Способы оплаты · ${year}</h2><div class=card>${[...methods].map(([method,amount])=>kv(MT[method]||method,money2(amount))).join('')}</div>`:''}
+<h2 class=sec>Своевременность оплат</h2><div class=card>${timing.known?`${kv('В срок или заранее',String(timing.onTime))}${kv('С опозданием',String(timing.late))}${timing.late?kv('Максимальная просрочка',timing.maxLate+' '+dayWord(timing.maxLate)):''}`:empty('Данные появятся после новых оплат','clock')}</div><div class=sub>Оцениваются полные оплаты с сохранённым сроком. Частичные оплаты, периоды полностью за скидку и старые платежи без этой даты не оцениваются. Отсрочка без неустойки не изменяет договорную дату оплаты.</div>`;
+}
+function analytics(){
+const today=TODAY(),currentYear=Number(today.slice(0,4)),currentMonth=Number(today.slice(5,7));
+const issued=K('rent').map(r=>({r,date:analysisDate(r.issued)||analysisDate(r.start)}))
+    .filter(({date})=>date&&date<=today);
+const firstByClient=new Map();
+for(const entry of issued){
+    const key=entry.r.client||entry.r.id,previous=firstByClient.get(key);
+    if(!previous||entry.date<previous.date)firstByClient.set(key,entry);
+}
+const newClients=new Set(firstByClient.values());
+const firstYear=issued.reduce((earliest,{date})=>Math.min(earliest,Number(date.slice(0,4))),currentYear);
+const year=Math.max(firstYear,Math.min(issueChartYear??currentYear,currentYear));
+const months=MN.map(()=>({issued:0,eligible:0,renewed:0,completed:0,days:0})),sources=new Map();
+for(const entry of issued){
+    const {r,date}=entry;
+    if(Number(date.slice(0,4))!=year)continue;
+    const month=months[Number(date.slice(5,7))-1];
+    if(newClients.has(entry))month.issued++;
+    if(typeof r.renewed=='boolean'){
+        month.eligible++;
+        if(r.renewed)month.renewed++;
+    }
+    const end=analysisDate(r.closed);
+    if((r.status=='closed'||r.status=='seized')&&end&&end>=date&&end<=today){
+        month.completed++;
+        month.days+=diff(end,date)+1;
+    }
+    if(!newClients.has(entry))continue;
+    const raw=String(S.docs.client?.[r.client]?.src||'').trim().replace(/\s+/g,' ')||'Источник не указан';
+    const name=SOURCE_NAMES.get(raw.toLocaleLowerCase('ru'))||raw,key=name.toLocaleLowerCase('ru');
+    if(!sources.has(key))sources.set(key,[name,0]);
+    sources.get(key)[1]++;
+}
+const max=Math.max(1,...months.map(x=>x.issued));
+const chart=MN.map((month,i)=>{
+    const future=year==currentYear&&i+1>currentMonth;
+    const count=months[i].issued,height=count?Math.max(2,100*count/max):0;
+    const label=future?`${month} ещё впереди`:`${month} — ${count} ${plural(count,'выдача','выдачи','выдач')}`;
+    return `<li class="${future?'issue-future':''}" aria-label="${label}">
+        <span class=issue-track aria-hidden=true>${future?'':`<span class=issue-bar style="height:${height}%"><b>${count}</b></span>`}</span>
+        <span class=issue-month aria-hidden=true>${month.slice(0,3)}</span>
+    </li>`;
+}).join('');
+const yearOutcome=months.reduce((sum,x)=>{
+    sum.eligible+=x.eligible;sum.renewed+=x.renewed;sum.completed+=x.completed;sum.days+=x.days;
+    return sum;
+},{eligible:0,renewed:0,completed:0,days:0});
+const outcomes=months.map((x,i)=>x.eligible||x.completed?outcomeRow(MN[i],x):'').join('');
+const channels=[...sources.values()].sort(([a,n],[b,m])=>m-n||a.localeCompare(b,'ru'));
+return receiptForecast()+`<h2 class=sec>Выдачи велосипедов новым клиентам</h2>
+<div class=issue-year>
+    <button class=ib aria-label="Предыдущий год" onclick="issueChartYear=${year-1};render(true)" ${year<=firstYear?'disabled':''}>${ic('left')}</button>
+    <b>${year}</b>
+    <button class=ib aria-label="Следующий год" onclick="issueChartYear=${year+1};render(true)" ${year>=currentYear?'disabled':''}>${ic('right')}</button>
+</div>
+<div class="card issue-chart"><ol class=issue-months aria-label="Количество выдач по месяцам за ${year} год">${chart}</ol></div>
+<div class=sub>Считается первая выдача каждому клиенту.${year==currentYear?` Данные по ${dshort(today)}.`:''}</div>
+<h2 class=sec>Продления и средний срок</h2>
+<div class=card>${outcomes?`<table class=rental-outcomes>
+    <thead><tr><th scope=col>Месяц выдачи</th><th scope=col>Продлили</th><th scope=col>Средний срок</th></tr></thead>
+    <tbody>${outcomeRow('За год',yearOutcome)}${outcomes}</tbody>
+</table>`:empty('Пока нет данных за выбранный год','chart')}</div>
+<div class=sub>Доля продлений считается по арендам с известным первым сроком, который уже закончился. Средний срок считается по завершённым арендам.</div>
+${paymentAnalytics(year)}
+<h2 class=sec>Выдачи по источникам</h2>
+<div class="card source-chart">${channels.length?bars(channels,n=>n.toLocaleString('ru')):empty('Выдач за выбранный год нет','chart')}</div>
+<div class=sub>По первым выдачам. Источник берётся из карточки клиента.</div>`;
+}
+const expRow=e=>`<button class="row nl" onclick="expF('${e.id}')"><span class=tx><b>${esc(e.title||e.cat)}</b><span>${fmt(e.date)} · ${esc(e.cat)}${e.bike?' · '+esc(bnum(e.bike)):' · общий'}</span></span><span class=rt><b>${m(e.amt)}</b></span></button>`;
+function expenses(){const E=K('exp').sort((a,b)=>b.date.localeCompare(a.date)),G2={};for(const e of E)(G2[e.date.slice(0,7)]=G2[e.date.slice(0,7)]||[]).push(e);
+return (can('exp')?`<div class=acts><button class="btn blk" onclick="expF()">${ic('plus','s')}Добавить расход</button></div>`:'')+(E.length?Object.entries(G2).map(([k,L])=>`<h2 class=sec>${MN[+k.slice(5,7)-1]} ${k.slice(0,4)} <span class="mu sm" style="margin-left:auto;font-weight:600">${m(L.reduce((a,e)=>a+e.amt,0))}</span></h2><div class=grp>${L.map(expRow).join('')}</div>`).join(''):`<div class=grp>${empty('Расходов пока нет','receipt')}</div>`)}
+async function expF(id,bike){if(!can('exp'))return;const e=id?G('exp',id):{date:TODAY(),bike:bike||'',cat:S.cfg.cats[0]},bs=K('bike').sort((a,b)=>(a.num||'').localeCompare(b.num||'','ru',{numeric:true}));
+await sheet(`<h3>${id?'Расход':'Новый расход'}</h3><div class=f2><label class=fld><span>Сумма, ₽</span><input id=ea type=number inputmode=decimal value="${e.amt||''}"></label><label class=fld><span>Дата</span><input id=ed type=date max="${TODAY()}" value="${e.date}"></label></div>
+<label class=fld><span>Категория</span><select id=ec>${S.cfg.cats.concat(S.cfg.cats.includes(e.cat)?[]:[e.cat]).map(c=>`<option ${c==e.cat?'selected':''}>${esc(c)}</option>`).join('')}</select></label>
+<label class=fld><span>Электровелосипед</span><select id=eb><option value="">Общий расход (без велосипеда)</option>${bs.map(b=>`<option value="${b.id}" ${b.id==e.bike?'selected':''}>${esc((b.num?b.num+' · ':'')+b.name)}</option>`).join('')}</select></label>
+<label class=fld><span>Описание</span><input id=et value="${esc(e.title||'')}" placeholder="Например: ремонт заднего колеса"></label>
+<button class="btn blk lg" data-y>Сохранить</button>${id?`<button class="btn dng blk" data-d>Удалить</button>`:''}<button class="btn sec blk" data-n>Отмена</button>`,(o,d)=>{const q=s=>o.querySelector(s).value;o.querySelector('[data-n]').onclick=()=>d();
+o.querySelector('[data-y]').onclick=()=>doAct('exp',{id,v:e._v,amt:+q('#ea'),date:q('#ed'),cat:q('#ec'),bike:q('#eb'),title:q('#et')},'Расход сохранён').finally(()=>d()).catch(()=>{});
+const x=o.querySelector('[data-d]');if(x)x.onclick=async()=>{if(await uiConfirm('Удалить расход?','Удалить',{danger:true}))doAct('expdel',{id},'Удалено').finally(()=>d()).catch(()=>{})}})}
+/* ---------- Ещё */
+function more(){const unk=K('unk').filter(u=>u.status=='open').length,it=[['users','Клиенты','clients',`${K('client').filter(c=>!c.arch).length}`]];
+if(unk&&can('pay_review'))it.push(['alert','Не распознанные платежи','unkL',String(unk)]);if(isOwner())it.push(['sliders','Настройки','settings',''],['shield','Администраторы','admins',`${K('admin').length}`],['down','Копии и перенос данных','backup',''],['list','Журнал изменений','logS','']);
+return hd('Ещё',ME.role=='admin'?ME.name:'')+`<div class=grp>${it.map(([i,n,s,r])=>`<button class=row onclick="go('${s}')"><span class=gl>${ic(i)}</span><span class=tx><b>${n}</b></span><span class=rt><span class=mu>${r}</span></span>${ic('right','s')}</button>`).join('')}</div>`}
+function unkL(){const U=K('unk').sort((a,b)=>b.ts.localeCompare(a.ts));return bk()+hd('Не распознано')+`<div class=sub style="margin:0 22px 8px">Платежи по QR, которые не удалось засчитать автоматически: оплатили не в тот день, после изменений в аренде или повторно.</div>`+(U.length?`<div class=grp>${U.map(u=>{const r=G('rent',u.rent)||{};return `<button class=row onclick="unkS('${u.id}')"><span class="gl ${u.status=='open'?'t-er':'t-n'}">${ic(u.status=='open'?'alert':'check')}</span><span class=tx><b>${m(u.amt)}</b><span>${esc(r.client?cname(r.client):'')} · ${fmt(u.ts.slice(0,10))}${u.status!='open'?' · разобрано':''}</span></span></button>`}).join('')}</div>`:`<div class=grp>${empty('Всё разобрано','check')}</div>`)}
+async function unkS(id){const u=G('unk',id),r=G('rent',u.rent);if(u.status!='open')return uiAlert(u.status=='applied'?'Платёж засчитан в аренду.':'Отмечено как разобранное. '+(u.note||''));
+const term=G('qr',u.qr)?.term,active=r?.status=='active'&&!r.waiting,canDebt=active&&u.amt<=(r.st.dl||0);
+await sheet(`<h3>Платёж ${m(u.amt)}</h3><p>${esc(u.why||'')}. Клиент: ${esc(r?cname(r.client):'—')}.</p>${active?`<div class=fld><span>Засчитать как оплату периодов</span>${r.st.firstterm||term?paymentOptions(r.st,r.st.firstterm?[r.st.firstterm]:Object.keys(r.rates||{})):seg('n',[[1,'1'],[2,'2'],[3,'3']],1)}</div><button class="btn blk" data-a>Засчитать в аренду</button>`:r&&r.debt?`<button class="btn blk" data-a>Засчитать в долг</button>`:''}
+${canDebt?'<button class="btn sec blk" data-debt>Засчитать в счёт долга</button>':''}
+<label class=fld><span>Или отметить как разобранный (например, вернули деньги)</span><input id=un placeholder="Комментарий"></label><button class="btn sec blk" data-d>Разобрано</button><button class="btn sec blk" data-n>Отмена</button>`,(o,d)=>{wireSeg(o);o.querySelector('[data-n]').onclick=()=>d();
+const a=o.querySelector('[data-a]');if(a)a.onclick=()=>doAct('unk',{id,do:'apply',rent:u.rent,...(active?selectedPeriod(o):{})},'Засчитано').finally(()=>d()).catch(()=>{});
+const debt=o.querySelector('[data-debt]');
+if(debt)debt.onclick=()=>doAct('unk',{id,do:'debt'},'Засчитано в долг').then(()=>d()).catch(()=>{});
+o.querySelector('[data-d]').onclick=()=>doAct('unk',{id,do:'done',note:o.querySelector('#un').value},'Отмечено').finally(()=>d()).catch(()=>{})})}
+const BOT_INFO_FIELDS=[
+    ['name','Наименование ИП','text'],['inn','ИНН ИП','text'],['ogrnip','ОГРНИП','text'],
+    ['phone','Телефон в меню бота','tel'],['email','Рабочая почта','email'],
+    ['pickup','Место выдачи и возврата, если публикуете','text'],
+    ['privacy','Ссылка на свою политику обработки данных','url'],
+];
+function botInfoSettings(info){
+const ready=info.name&&info.inn&&info.ogrnip;
+return `<details class="fold rate-schedule" style="margin-top:18px">
+<summary><span>${ic('right','s')}Меню бота /start</span></summary>
+<div class="sm mu" style="padding:8px 0 2px">Эти сведения видит любой, кто запустил бота. При пустой ссылке бот показывает встроенную политику обработки данных.</div>
+<div class="note ${ready?'t-ok':'t-wa'}" style="margin:8px 0">${ready?'Реквизиты заполнены.':'Для проверки Точкой укажите название ИП, ИНН и ОГРНИП.'}</div>
+${BOT_INFO_FIELDS.map(([field,label,type])=>`<label class=fld><span>${label}</span><input id="bot-info-${field}" type="${type}" ${['inn','ogrnip'].includes(field)?'inputmode="numeric"':''} value="${esc(info[field]||'')}"></label>`).join('')}
+</details>`;
+}
+function settings(){const c=S.cfg,t=c.tochka||{};const f=(id,l,v,ty='number')=>`<label class=fld><span>${l}</span><input id=${id} type=${ty} ${ty=='number'?'inputmode=decimal':''} value="${esc(v)}"></label>`;
+return bk()+hd('Настройки')+`<div class=form><h3>Тарифы по умолчанию</h3><div id=default-rates>${rateFields(c.renewal_rates,true)}</div>
+<h3>Неустойка и отсрочки</h3><div class=f2>${f('sp','Неустойка, % от платежа в день',c.pen)}${f('sg','Дней просрочки без неустойки',c.grace)}</div><div class=f2>${f('sd','Отсрочка по заявке клиента, макс. дней (0–3)',c.cdef)}${f('sdd','Срок доплаты долга по умолчанию, дней',c.ddays)}</div>
+<h3>Архив клиентов</h3>${f('sar','Отправлять в архив после стольких дней без аренды (0 — не отправлять)',c.archdays)}
+<h3>Удержания по СБП</h3><div class=f2>${f('st','Налог, %',c.tax)}${f('sa','Эквайринг, %',c.acq)}</div>${f('sr','Чеки, % от платежа по СБП',c.receipt||0)}
+<h3>Категории расходов</h3><textarea id=sc rows=6>${esc(c.cats.join('\n'))}</textarea><div class=sub style="margin:6px 4px">По одной на строке.</div>
+<h3>Оплата по QR (Точка)</h3><div class="note ${t.on?'t-ok':'t-wa'}" style="margin:8px 0">${ic(t.on?'check':'alert','s')}<div>${t.on?'Подключено: QR выставляются, оплаты отмечаются сами.':'Не подключено. Пока оплату отмечаете вручную.'}</div></div>
+${f('tm','ID торговой точки (merchantId)',t.merchant||'','text')}${f('ta','ID счёта (accountId)',t.account||'','text')}<label class=fld><span>JWT-токен из интернет-банка Точки</span><input id=tj type=password placeholder="${t.jwt?'сохранён — оставьте пустым, чтобы не менять':'вставьте токен'}"></label>
+${t.hook?`<div class=sub style="margin:8px 4px">Адрес для вебхука в Точке: <br><b style="word-break:break-all">${esc(location.origin+'/hook/tochka/'+t.hook)}</b></div>`:''}
+<h3>Контакты для клиентов</h3>${f('scp','Телефон',c.cphone||'','tel')}${f('scm','Ссылка на чат в МАКСе',c.cmax||'','url')}${f('sct','Ссылка на чат в Telegram',c.ctg||'','url')}
+${botInfoSettings(c.bot_info||{})}
+<h3>Уведомления в Telegram</h3><div class=card style="margin:8px 0;padding:0"><label class=sw><span class=tx><b>Сообщения мне</b><span>Сводка в 10:00, заявки на отсрочку, оплаты по QR</span></span><input type=checkbox id=no ${c.nown?'checked':''}></label>
+<label class=sw><span class=tx><b>Напоминания клиентам</b><span>Накануне и в день оплаты, в 10:00</span></span><input type=checkbox id=nc ${c.ncli?'checked':''}></label></div>
+<div class=sub style="margin:0 4px">Пока сервер не может достучаться до Telegram, сообщения не доходят. Приложение от этого не зависит.</div>
+<button class="btn blk lg" style="margin-top:20px" onclick="saveCfg(this)">Сохранить</button></div>`}
+async function saveCfg(el){
+const q=s=>$(s).value,inputs=$('#default-rates').querySelectorAll('[data-rate]');
+const invalid=[...inputs].find(input=>!input.checkValidity());
+if(invalid){invalid.reportValidity();return}
+const botInfo=Object.fromEntries(BOT_INFO_FIELDS.map(([field])=>[field,q('#bot-info-'+field)]));
+el.disabled=true;try{await act('cfg',{renewal_rates:rateValues(inputs),pen:+q('#sp'),grace:+q('#sg'),cdef:+q('#sd'),ddays:+q('#sdd'),archdays:+q('#sar'),cphone:q('#scp'),cmax:q('#scm'),ctg:q('#sct'),bot_info:botInfo,tax:+q('#st'),acq:+q('#sa'),receipt:+q('#sr'),cats:q('#sc').split('\n'),nown:$('#no').checked,ncli:$('#nc').checked,tochka:{merchant:q('#tm'),account:q('#ta'),jwt:q('#tj')}});hap('success');toast('Сохранено');await reload()}catch(e){uiAlert(e)}el.disabled=false}
+const ADMIN_GROUPS=[
+['Аренда',[
+    ['rent_issue','Выдавать велосипеды','Оформлять аренду и отмечать оплату при выдаче'],
+    ['rent_return','Оформлять возврат','Переводить в ожидание возврата и завершать аренду'],
+    ['rent_rates','Менять тарифы','Менять цены аренды, включая первый срок'],
+    ['rent_note','Менять заметки по аренде','Добавлять и редактировать внутренние заметки'],
+    ['rent_contract','Менять номер договора','Исправлять номер договора в карточке аренды'],
+    ['rent_date','Исправлять дату оплаты','Сдвигать даты будущих платежей'],
+    ['seize','Изымать велосипеды','Закрывать аренду с обнулением долга']]],
+['Оплата',[
+    ['pay_accept','Принимать оплату','Записывать оплату за период, по счёту и в погашение долга'],
+    ['partial','Принимать частичную оплату','Принимать часть платежа и назначать дату доплаты'],
+    ['bill','Выставлять платежи','Выставлять и отменять платежи в приложении клиента'],
+    ['pay_qr','Выставлять QR для оплаты','Создавать и отменять QR на аренду и долг'],
+    ['pay_review','Разбирать нераспознанные платежи','Засчитывать платежи по СБП вручную'],
+    ['pay_delete','Удалять записанные платежи','Удалять оплату наличными или переводом по активной аренде']]],
+['Отсрочки и неустойка',[
+    ['defer_manual','Назначать отсрочки','Давать и снимать отсрочки вручную'],
+    ['defer_requests','Решать по заявкам на отсрочку','Одобрять или отклонять заявки клиентов'],
+    ['pen_toggle','Включать и отключать неустойку','Управлять начислением по отдельной аренде'],
+    ['pen_waive','Списывать неустойку','Списывать уже начисленную сумму']]],
+['Клиенты',[
+    ['client_edit','Добавлять и изменять клиентов','Редактировать карточки и заметки'],
+    ['client_archive','Управлять архивом клиентов','Отправлять в архив и восстанавливать'],
+    ['client_block','Управлять чёрным списком','Добавлять клиентов в список и убирать из него'],
+    ['client_access','Управлять входом клиентов','Создавать ссылки и QR для входа, сбрасывать привязку']]],
+['Велопарк',[
+    ['bike_edit','Добавлять и изменять велосипеды','Редактировать данные в карточке велосипеда'],
+    ['bike_status','Менять статус велосипеда','Отмечать ремонт, продажу и другие статусы']]],
+['Финансы',[
+    ['exp','Вести расходы','Добавлять, менять и удалять расходы'],
+    ['reports','Смотреть статистику и аналитику','Видеть выручку, прибыль, закупку и окупаемость']]],
+];
+const PERM_LABELS=Object.fromEntries(ADMIN_GROUPS.flatMap(([,items])=>items.map(([key,label])=>[key,label])));
+const DEFAULT_ADMIN_PERMS=['pay_accept','pay_qr','pay_review','defer_manual','defer_requests','rent_issue','rent_return',
+    'rent_rates','rent_note','rent_contract','client_edit','client_archive','client_block','client_access'];
+function admins(){const A=K('admin');return bk()+hd('Администраторы','',`<button class=ib onclick="adminF()" aria-label="Добавить">${ic('plus')}</button>`)+(A.length?`<div class=grp>${A.map(a=>`<button class=row onclick="adminF('${a.id}')"><span class=av>${esc(ini(a.name))}</span><span class=tx><b>${esc(a.name)}</b><span>${esc(a.phone)} · ${a.tg?'вошёл':'ещё не входил'}</span></span><span class=rt>${a.disabled?chip('отключён'):''}</span></button>`).join('')}</div>`:`<div class=grp>${empty('Администраторов нет','shield')}</div>`)+`<div class=sub>Администратор входит по ссылке и номеру телефона. Права выбираете вы.</div>`}
+async function adminF(id){const a=id?G('admin',id):{perms:DEFAULT_ADMIN_PERMS};
+await sheet(`<h3>${id?esc(a.name):'Новый администратор'}</h3><label class=fld><span>Имя</span><input id=an value="${esc(a.name||'')}"></label><label class=fld><span>Телефон</span><input id=ap type=tel value="${esc(a.phone||'')}"></label>
+${ADMIN_GROUPS.map(([title,items])=>`<h3 style="margin-top:18px">${title}</h3><div class=card style="margin:8px 0 0;padding:0;background:var(--fill)">${items.map(([key,label,hint])=>`<label class=sw><span class=tx><b>${label}</b><span>${hint}</span></span><input type=checkbox data-p="${key}" ${(a.perms||[]).includes(key)?'checked':''}></label>`).join('')}</div>`).join('')}
+${id?`<div class=card style="margin:14px 0 0;padding:0"><label class=sw><span class=tx><b>Отключить администратора</b><span>Доступ к приложению будет закрыт</span></span><input type=checkbox id=ad ${a.disabled?'checked':''}></label></div>`:''}
+<button class="btn blk lg" data-y>Сохранить</button>${id?`<button class="btn sec blk" data-q>${ic('qr','s')}QR для входа</button><button class="btn sec blk" data-i>${ic('link','s')}Ссылка для входа</button><button class="btn dng blk" data-d>Удалить</button>`:''}<button class="btn sec blk" data-n>Отмена</button>`,(o,d)=>{o.querySelector('[data-n]').onclick=()=>d();
+o.querySelector('[data-y]').onclick=async()=>{try{const r=await act('admin',{id,name:o.querySelector('#an').value,phone:o.querySelector('#ap').value,perms:[...o.querySelectorAll('[data-p]:checked')].map(x=>x.dataset.p),disabled:!!(o.querySelector('#ad')||{}).checked});d();await reload();if(!id)invite('adm:'+r.id)}catch(e){uiAlert(e)}};
+const i=o.querySelector('[data-i]');if(i)i.onclick=()=>{d();invite('adm:'+id)};const qb=o.querySelector('[data-q]');if(qb)qb.onclick=()=>{d();loginQR('adm:'+id)};const x=o.querySelector('[data-d]');if(x)x.onclick=async()=>{if(await uiConfirm('Удалить администратора?','Удалить',{danger:true})){d();doAct('admindel',{id},'Удалён').catch(()=>{})}}})}
+function backupReminderPanel(){
+const reminder=S?.backup_reminder||ME?.backup_reminder;
+if(!isOwner()||!reminder?.due)return '';
+return `<div class="card t-wa backup-reminder" role=status><b>Пора скачать резервную копию</b><div class=sm style="margin-top:6px">${reminder.last?'С последней выгрузки прошло не менее трёх дней.':'Вы ещё не скачивали резервную копию.'} Скачайте все данные одним файлом и сохраните его на компьютере.</div><button class="btn blk" style="margin-top:12px" onclick="downloadBackup(this)">${ic('down','s')}Скачать копию</button><div class="sm mu" style="margin-top:8px">Следующее напоминание — через три дня после выгрузки.</div></div>`;
+}
+async function refreshBackupStatus(){
+if(!isOwner()||document.querySelector('.ov'))return;
+try{const previous=JSON.stringify(ME.backup_reminder),fresh=await api('/api/me');if(fresh.role!='owner'||document.querySelector('.ov'))return;
+ME.backup=fresh.backup;ME.backup_reminder=fresh.backup_reminder;
+if(S){S.backup=fresh.backup;S.backup_reminder=fresh.backup_reminder}
+if(previous!==JSON.stringify(fresh.backup_reminder)&&['today','backup'].includes(V.at(-1)?.[0])&&!document.querySelector('.ov'))render(true)
+}catch{}
+}
+function backup(){const b=ME.backup,reminder=ME.backup_reminder;return bk()+hd('Копии и перенос')+`<div class=card><b>Скачать копию</b><div class="sm mu" style="margin:6px 0 12px">Все данные одним файлом. Сервер и так сохраняет копию каждую ночь в 03:00.${b?'<br>Последняя выгрузка: '+fmt(b.ts.slice(0,10)):''}<br>Напоминание о скачивании появляется на странице «Сегодня» раз в три дня.${reminder?.next?'<br>Следующее — '+fmt(reminder.next.slice(0,10)):''}</div><button class="btn blk" onclick="downloadBackup(this)">${ic('down','s')}Скачать копию</button></div>
+<div class=card><b>Загрузить из файла</b><div class="sm mu" style="margin:6px 0 12px">Файл переноса из старого сервиса или ранее скачанная копия. <b>Все текущие данные заменятся.</b> Перед этим сервер сохранит их в служебную копию.</div><label class="btn sec blk">${ic('up','s')}Выбрать файл<input type=file accept=".json,application/json" style="display:none" onchange="restoreFile(this)"></label></div>`}
+async function downloadBackup(button){
+    if(button.disabled)return;
+    const caption=button.innerHTML,preparedAt=Date.now();
+    button.disabled=true;
+    button.textContent='Готовлю…';
+    let ticket;
+    try{
+        ticket=await api('/api/dl',{});
+    }catch(error){
+        return uiAlert(error==='код 403'
+            ?'Откройте приложение заново с аккаунта владельца и повторите скачивание.'
+            :'Не удалось подготовить копию: '+error);
+    }finally{
+        button.disabled=false;
+        button.innerHTML=caption;
+    }
+
+    const url=location.origin+ticket.url;
+    const expiresAt=preparedAt+ticket.expires_in*1000;
+    const native=typeof T.downloadFile==='function'&&T.isVersionAtLeast?.('8.0');
+    const started=await sheet(`<h3>Скачать копию</h3>
+        <p>${esc(ticket.filename)}</p>
+        <a class="btn blk lg" data-browser href="${esc(url)}" target="_blank" rel="noopener noreferrer">Скачать через браузер</a>
+        ${native?'<button class="btn sec blk" data-telegram>Скачать в Telegram</button>':''}
+        <div class="sm mu" data-status role="status" style="margin-top:8px"></div>
+        <button class="btn sec blk" data-close>Закрыть</button>`,
+    (dialog,close)=>{
+        const status=dialog.querySelector('[data-status]');
+        const available=()=>{
+            if(Date.now()<expiresAt)return true;
+            status.textContent='Ссылка истекла. Закройте окно и нажмите «Скачать копию» ещё раз.';
+            return false;
+        };
+        const browser=dialog.querySelector('[data-browser]');
+        browser.onclick=event=>{
+            if(!available()){event.preventDefault();return}
+            // Этот вызов должен идти прямо из клика, чтобы браузер мог открыть новое окно.
+            if(T.openLink&&!String(T.platform||'').startsWith('web')){
+                try{T.openLink(url);event.preventDefault()}catch{}
+            }
+            close(true);
+        };
+        const telegram=dialog.querySelector('[data-telegram]');
+        if(telegram)telegram.onclick=()=>{
+            if(!available())return;
+            try{
+                T.downloadFile({url,file_name:ticket.filename},accepted=>{
+                    if(accepted)close(true);
+                    else status.textContent='Копию можно скачать через браузер.';
+                });
+            }catch{
+                status.textContent='Telegram не открыл загрузку. Скачайте копию через браузер.';
+            }
+        };
+        dialog.querySelector('[data-close]').onclick=()=>close(false);
+    },false);
+    if(started){
+        setTimeout(refreshBackupStatus,350);
+        setTimeout(refreshBackupStatus,2000);
+    }
+}
+async function restoreFile(el){const f=el.files[0];el.value='';if(!f)return;let b;try{b=JSON.parse(await f.text())}catch(e){return uiAlert('Не удалось прочитать файл.')}
+if(!b||b.v!=1||b.app!='rent'||!Array.isArray(b.docs))return uiAlert('Это не файл приложения аренды.');const n=k=>b.docs.filter(x=>x.kind==k).length;
+if(!await uiConfirm(`В файле: велосипедов ${n('bike')}, клиентов ${n('client')}, аренд ${n('rent')}, расходов ${n('exp')}.\nТекущие данные заменятся.`,'Загрузить',{danger:!ME.empty,title:'Загрузить данные?'}))return;
+try{const r=await api('/api/restore',b);ME=await api('/api/me');await load();V=[['today']];render();uiAlert('Загружено записей: '+r.docs,'Готово')}catch(e){uiAlert('Не удалось загрузить: '+e)}}
+const LA={
+    archive:'Клиент отправлен в архив',unarchive:'Клиент восстановлен из архива',purge:'Клиент удалён навсегда',
+    issue:'Выдан велосипед',waitreturn:'Аренда переведена в ожидание возврата',return:'Аренда завершена',
+    seize:'Велосипед изъят',rates:'Изменены цены продления',price:'Изменён тариф аренды',
+    contract:'Изменён номер договора',rentnote:'Изменена заметка по аренде',fix:'Исправлена дата оплаты',
+    pay:'Принята оплата аренды',paypart:'Принята частичная оплата',paydl:'Принята доплата долга',
+    'pay-qr':'Оплата по СБП засчитана в аренду',paydebt:'Погашен долг по закрытой аренде',paydel:'Удалён платёж',
+    bill:'Выставлен платёж клиенту','bill-void':'Выставленный платёж отменён',
+    'bill-paid':'Выставленный платёж закрыт','billpaid':'Ручная оплата по выставленному платежу засчитана',
+    defer:'Назначена отсрочка',undefer:'Отсрочка снята',nopen:'Изменено начисление неустойки',waive:'Неустойка списана',
+    'req-new':'Клиент запросил отсрочку',req:'Рассмотрена заявка на отсрочку',
+    'return-request':'Клиент запланировал возврат','return-cancel':'Клиент отменил заявку на возврат',returnack:'Заявка на возврат просмотрена',
+    discount:'Изменена скидка клиента','discount-used':'Скидка использована','discount-restored':'Скидка восстановлена',
+    qr:'Выставлен QR для оплаты','qr-paid':'Банк подтвердил оплату по QR','qr-void':'QR для оплаты отменён',
+    unk:'Разбор платежа по СБП','unk-apply':'Платёж по СБП вручную засчитан в аренду',
+    black:'Изменён чёрный список',bikestat:'Изменён статус велосипеда',expdel:'Расход удалён',
+    cfg:'Сохранены настройки',admindel:'Администратор удалён',restore:'Данные загружены из файла',
+    invite:'Создано приглашение для входа',unbind:'Сброшена привязка входа',login:'Выполнен вход по приглашению',
+    migrate:'Обновлены данные аренды',
+};
+const LOG_FIELDS={
+    contract:'Номер договора',name:'Имя',phone:'Телефон',cdate:'Дата договора',src:'Откуда пришёл',note:'Заметка',
+    num:'Номер велосипеда',vin:'VIN',point:'Точка выдачи',cost:'Стоимость покупки',bought:'Дата покупки',
+    amt:'Сумма',date:'Дата',cat:'Категория',title:'Описание',pen:'Неустойка',grace:'Льготных дней',
+    tax:'Налог по СБП',acq:'Эквайринг по СБП',receipt:'Чеки по СБП',cdef:'Лимит отсрочки',
+    ddays:'Срок доплаты долга, дней',archdays:'Срок отправки в архив, дней',cats:'Категории расходов',
+    cphone:'Контактный телефон',ctg:'Контакт в Telegram',cmax:'Контакт в МАКСе',
+    nown:'Уведомления владельцу',ncli:'Напоминания клиентам',
+};
+const LEGACY_PERM_LABELS={rents:'Выдача и возврат',pay:'Оплата и QR',defer:'Отсрочки',pen:'Неустойка',
+    clients:'Работа с клиентами',bikes:'Велопарк'};
+const logValue=x=>x==null||x===''?'—':String(x);
+function logData(raw){try{return JSON.parse(raw||'{}')||{}}catch(e){return {}}}
+function logChanged(details,label,before,after,format=logValue){
+    if((before??'')!==(after??''))details.push(`${label} · ${format(before)} → ${format(after)}`);
+}
+function logFields(details,keys,before,after){
+    for(const key of keys){
+        const money=['cost','amt'].includes(key),date=['cdate','bought','date'].includes(key);
+        const percent=['pen','tax','acq','receipt'].includes(key);
+        const format=x=>x==null||x===''?'—':money?money2(x):date?fmt(x):percent?x+'%':typeof x=='boolean'?(x?'включено':'выключено'):Array.isArray(x)?x.join(', '):String(x);
+        if(JSON.stringify(before[key]??'')!==JSON.stringify(after[key]??'')){
+            details.push(before._v?`${LOG_FIELDS[key]} · ${format(before[key])} → ${format(after[key])}`:`${LOG_FIELDS[key]} · ${format(after[key])}`);
+        }
+    }
+}
+function logPayment(p){
+    const period=p.term?termLabel(p.term):p.n?`${p.n} ${plural(p.n,'период','периода','периодов')}`:'';
+    return [money2(p.amt),MT[p.method],p.kind=='debt'?'в счёт долга':p.kind=='part'?'часть платежа за период':period,
+        p.discount?'скидка '+money2(p.discount):'',p.pen?'неустойка '+money2(p.pen):'',p.ts?fmt(p.ts.slice(0,10)):''].filter(Boolean).join(' · ');
+}
+function logRates(details,before,after){
+    for(const [key,label] of TERMS)logChanged(details,label,before?.[key],after?.[key],x=>x==null?'—':money2(x));
+}
+function journalEntry([ts,tag,id,oldRaw,newRaw]){
+    const [key,...actorParts]=tag.split('@'),a=logData(oldRaw),b=logData(newRaw),d=newRaw?b:a,details=[];
+    const rentDoc=G('rent',d.rent||id);
+    const clientName=d.client?cname(d.client):rentDoc?cname(rentDoc.client):'';
+    const clientAction=['client','archive','unarchive','black','purge'].includes(key);
+    const bikeAction=['bike','bikestat'].includes(key);
+    const name=bikeAction?[d.num,d.name].filter(Boolean).join(' · '):d.name||clientName|| (clientAction?G('client',id)?.name:'');
+    const bike=d.bike||rentDoc?.bike;
+    let title=LA[key]||key;
+    if(bike&&!bikeAction)details.push('Велосипед · '+bfull(bike));
+    switch(key){
+        case 'issue': {
+            const term=d.initial?.term,amount=d.once?.['1']??d.initial?.price??d.price;
+            if(d.issued)details.push('Выдан · '+fmt(d.issued));
+            if(d.contract)details.push('Договор № '+d.contract);
+            if(term||d.type)details.push(['Первый срок',termLabel(term)||TY[d.type],amount!=null?money2(amount):''].filter(Boolean).join(' · '));
+            if(d.free)details.push('Первый день бесплатно');
+            if(!d.pays?.length)details.push('Оплатит позже');
+            break;
+        }
+        case 'rates':
+        case 'price': {
+            logRates(details,a.rates,b.rates);
+            const before=(a.plan||[]).at(-1),after=(b.plan||[]).at(-1);
+            const recurring=p=>p?`${money2(p.price)} / ${TY[p.type]}, с периода ${p.k}`:null;
+            logChanged(details,'Базовый тариф',recurring(before),recurring(after));
+            for(const k of new Set([...Object.keys(a.once||{}),...Object.keys(b.once||{})])){
+                logChanged(details,`Разовая цена на период ${k}`,a.once?.[k],b.once?.[k],x=>x==null?'—':money2(x));
+            }
+            break;
+        }
+        case 'rentnote': logFields(details,['note'],a,b);break;
+        case 'discount': case 'discount-used': case 'discount-restored':
+            logChanged(details,'Скидка',a.discount?.amt,b.discount?.amt,x=>x==null?'—':money2(x));
+            if(b.discount?.note)details.push(b.discount.note);
+            break;
+        case 'return-request': case 'returnack':
+            if(b.return_request?.date)details.push('Планируемый возврат · '+fmt(b.return_request.date));
+            if(b.return_request?.note)details.push(b.return_request.note);
+            break;
+        case 'contract': logFields(details,['contract'],a,b);break;
+        case 'fix': {
+            const change=(b.shift||0)-(a.shift||0);
+            if(d._audit?.from)logChanged(details,'Дата оплаты',d._audit.from,d._audit.to,fmt);
+            else if(change)details.push(`Дата оплаты сдвинута на ${Math.abs(change)} ${dayWord(Math.abs(change))} ${change>0?'вперёд':'назад'}`);
+            break;
+        }
+        case 'waitreturn':
+            if(d.waiting)details.push('Начисления остановлены с '+fmt(d.waiting));
+            break;
+        case 'return':
+        case 'seize':
+            if(d.closed)details.push('Дата закрытия · '+fmt(d.closed));
+            if(d.debt)details.push('Остался долг · '+money2(d.debt));
+            if(d.refund?.amt)details.push('Возврат клиенту · '+money2(d.refund.amt));
+            if(d.writeoff)details.push('Списано при изъятии · '+money2(d.writeoff));
+            break;
+        case 'defer':
+        case 'undefer': {
+            const last=(key=='defer'?b.defer:a.defer)?.at(-1);
+            if(last?.until)details.push('Отсрочка до '+fmt(last.until));
+            if(last?.req)details.push('По заявке клиента');
+            break;
+        }
+        case 'nopen': title=d.nopen?'Начисление неустойки отключено':'Начисление неустойки возобновлено';break;
+        case 'waive': {
+            const last=d.waived?.at(-1);
+            if(last)details.push('Списано · '+money2(last.amt));
+            break;
+        }
+        case 'req-new':
+        case 'req':
+            if(key=='req')title=d.status=='ok'?'Заявка на отсрочку одобрена':d.status=='no'?'Заявка на отсрочку отклонена':title;
+            if(d.days)details.push(`Запрошено · ${d.days} ${dayWord(d.days)}`);
+            if(d.until)details.push('Одобрено до '+fmt(d.until));
+            break;
+        case 'bill': case 'bill-void': case 'bill-paid':
+        case 'qr': case 'qr-paid': case 'qr-void': case 'unk':
+            if(key=='unk')title={open:'Платёж по СБП не распознан',done:'Платёж отмечен как разобранный',applied:'Нераспознанный платёж засчитан'}[d.status]||title;
+            if(d.amt!=null)details.push('Сумма · '+money2(d.amt));
+            if(d.term)details.push('Срок · '+termLabel(d.term));
+            else if(d.n)details.push(`${d.n} ${plural(d.n,'период','периода','периодов')}`);
+            if(d.kind)details.push(d.kind=='debt'?'В счёт долга':'За период аренды');
+            if(d.due)details.push('Доплатить до '+fmt(d.due));
+            if(d.pen)details.push('Неустойка · '+money2(d.pen));
+            if(d.dpart)details.push('В счёт долга · '+money2(d.dpart));
+            if(d.note||d.why)details.push(d.note||d.why);
+            break;
+        case 'client':
+            title=oldRaw?'Изменена карточка клиента':'Добавлен клиент';
+            logFields(details,['name','phone','contract','cdate','src','note'],a,b);
+            break;
+        case 'archive':
+            if(d.archwhy=='auto')details.push('Автоматически после периода без аренды');
+            details.push('Привязка входа сброшена');
+            break;
+        case 'black':
+            title=d.black?'Клиент добавлен в чёрный список':'Клиент убран из чёрного списка';
+            if(d.bnote)details.push(d.bnote);
+            break;
+        case 'bike':
+            title=oldRaw?'Изменена карточка велосипеда':'Добавлен велосипед';
+            logFields(details,['num','name','vin','point','cost','bought','note'],a,b);
+            break;
+        case 'bikestat':
+            logChanged(details,'Статус',a.status,b.status,x=>BS[x]?.[0]||logValue(x));
+            if(d.sale)details.push(`Продан ${fmt(d.sale.date)} · ${money2(d.sale.amt)}`);
+            break;
+        case 'exp': case 'expdel':
+            if(key=='exp')title=oldRaw?'Изменён расход':'Добавлен расход';
+            logFields(details,['amt','cat','title','date'],newRaw?a:{},d);
+            break;
+        case 'cfg':
+            logRates(details,a.renewal_rates,b.renewal_rates);
+            logFields(details,['pen','grace','cdef','ddays','archdays','tax','acq','receipt','cats','cphone','ctg','cmax','nown','ncli'],a,b);
+            if(JSON.stringify(a.bot_info??{})!==JSON.stringify(b.bot_info??{}))details.push('Изменены сведения в меню бота /start');
+            if(b._audit?.bank_key_changed||JSON.stringify(a.tochka??{})!==JSON.stringify(b.tochka??{}))details.push('Изменено подключение Точки');
+            break;
+        case 'admin': case 'admindel': {
+            if(key=='admin')title=oldRaw?'Изменены настройки администратора':'Добавлен администратор';
+            logFields(details,['name','phone'],newRaw?a:{},d);
+            if(key=='admin'){
+                const label=k=>PERM_LABELS[k]||LEGACY_PERM_LABELS[k]||k;
+                const granted=(b.perms||[]).filter(k=>!(a.perms||[]).includes(k));
+                const revoked=(a.perms||[]).filter(k=>!(b.perms||[]).includes(k));
+                if(granted.length)details.push('Новые права · '+granted.map(label).join(', '));
+                if(revoked.length)details.push('Убраны права · '+revoked.map(label).join(', '));
+                if(!!a.disabled!==!!b.disabled)details.push(b.disabled?'Доступ отключён':'Доступ восстановлен');
+            }
+            break;
+        }
+        case 'invite': case 'unbind': case 'login':
+            details.push(d.target=='admin'?'Администратор':'Клиент');
+            if(d.method)details.push(d.method=='qr'?'По QR-коду':'По ссылке');
+            break;
+        case 'restore':
+            if(d.docs!=null)details.push('Загружено записей · '+d.docs);
+            break;
+    }
+    const before=a.pays||[],after=b.pays||[];
+    if(key=='paydel'){
+        const i=before.findIndex((p,i)=>JSON.stringify(p)!==JSON.stringify(after[i]));
+        if(i>=0)details.push('Удалено · '+logPayment(before[i]));
+    }else{
+        for(const payment of after.slice(before.length))details.push('Оплата · '+logPayment(payment));
+    }
+    if(['paypart','paydl','billpaid','pay-qr'].includes(key)){
+        const debt=(b.dl||[]).reduce((sum,x)=>sum+(x.amt||0)+(x.pen||0),0);
+        if(debt>0)details.push('Остаток долга · '+money2(debt));
+    }
+    const who=actorParts.join('@');
+    const actor=who=='Вы'||who=='Владелец'||(!who&&['cfg','restore','admindel'].includes(key))?'Владелец':
+        who=='клиент'?(name?'Клиент · '+name:'Клиент'):
+        who||(['qr-paid','bill-paid','pay-qr','unk'].includes(key)?'Автоматически · СБП':
+        ['archive','migrate'].includes(key)?'Система':'Не указан');
+    return `<div class="row wr nl journal-row" style="cursor:default;min-height:56px"><span class=tx><b>${esc(title)}${name?' · '+esc(name):''}</b><span>${fmt(ts.slice(0,10))} ${ts.slice(11,16)} · ${esc(actor)}</span>${details.map(info=>'<span>'+esc(info)+'</span>').join('')}</span></div>`;
+}
+let LOG=null;
+function logS(){
+    const header=bk()+hd('Журнал изменений','Последние 300 записей');
+    if(!LOG){
+        api('/api/log').then(l=>{LOG=l;render(true)}).catch(()=>{LOG=[];render(true)});
+        return header+'<div class=spin></div>';
+    }
+    const rows=LOG;LOG=null;
+    return header+`<div class=grp>${rows.length?rows.map(journalEntry).join(''):empty('Записей нет','list')}</div>`;
+}
+/* ---------- клиент */
+let CQ=null;
+const QB=k=>`<span class=qb role=button tabindex=0 aria-label="Что это" onclick="event.stopPropagation();helpS('${k}')">?</span>`;
+const HELP={
+days:()=>['Оплаченные дни','Столько дней аренды у вас уже оплачено, включая сегодня. В последний оплаченный день нужно оплатить следующий период.'],
+next:()=>['Когда платить',`Платить нужно в последний оплаченный день — до начала нового периода. Неделя — 7 дней, месяц — 30 дней. Даты следующих оплат не сдвигаются, даже если вы заплатили позже.`],
+late:()=>{const g=ME.grace||0,p=ME.pen,base=ME.rent?.st?.nprice??3700;return ['Просрочка и неустойка',`Если не оплатить вовремя, ${g?`первые ${g} ${dayWord(g)} неустойки нет. С ${g+1}-го дня`:'с первого дня'} просрочки начисляется ${p}% от платежа за каждый день. Пример: платёж ${money2(base)}, просрочка ${g+2} ${dayWord(g+2)} — неустойка ${money2(base*p/100*2)}. Сумма к оплате указана на сегодня.`]},
+debt:()=>{const g=ME.grace||0,p=ME.pen;return ['Долг',`Вы оплатили период не полностью. Остаток нужно доплатить до указанной даты. Если не успеть, ${g?`первые ${g} ${dayWord(g)} неустойки нет, затем `:''}на остаток начисляется ${p}% за каждый день. Сначала гасится неустойка, потом сам долг. Доплачивать можно частями.`]},
+bill:()=>['Выставленный платёж','Вам выставлен платёж на эту сумму. Оплатите его по QR — он сразу отметится в приложении. Если сумма меньше платежа за период, остаток станет долгом с датой доплаты.'],
+qr:()=>['Оплата по QR','Откроется QR на точную сумму. Оплатите в приложении своего банка через СБП. QR действует до конца дня, оплата отметится сама через пару минут.'],
+defer:()=>{const n=ME.cdef;return ['Отсрочка',`Можно попросить до ${n} ${dayWord(n)} без неустойки. Мы одобрим или отклоним заявку. Даты следующих оплат при этом не сдвигаются.`]},
+withdebt:()=>['Вместе с долгом','Одним платежом оплатите и аренду, и долг.'],
+returnbike:()=>['Планирую вернуть велосипед','Укажите дату, когда планируете привезти велосипед, и при необходимости оставьте комментарий. Мы увидим заявку; для согласования времени свяжитесь с нами. Сама заявка не останавливает аренду и начисления. Их останавливает арендодатель, переводя аренду в ожидание возврата или завершая её. Если планы изменились, заявку можно изменить или отменить.'],
+qrhow:()=>['Как оплатить по QR','Нажмите «Открыть в приложении банка» — откроется страница СБП, выберите там свой банк. Если банка нет в списке или он не открывается (так бывает на iPhone), сохраните QR в галерею, откройте приложение или сайт своего банка, выберите «Оплата по QR» → «Из галереи» и укажите картинку. Оплата отметится сама через пару минут.']};
+function openContact(event,link){
+const open=link.hostname=='t.me'&&T.openTelegramLink?T.openTelegramLink:T.openLink;
+if(open){event.preventDefault();open.call(T,link.href)}
+}
+function CBTN(){
+const phone=(ME.cphone||'').replace(/[^+0-9]/g,''),actions=[];
+if(ME.cmax)actions.push(['send','Написать в МАКС',ME.cmax,true]);
+if(ME.ctg)actions.push(['send','Написать в Telegram',ME.ctg,true]);
+if(phone)actions.push(['phone','Позвонить','tel:'+phone,false]);
+return actions.length?`<div class="cp contact-links">${actions.map(([icon,label,link,chat])=>`<a class=tl href="${esc(link)}" ${chat?'target="_blank" rel="noopener" onclick="openContact(event,this)"':''}><span class=gl>${ic(icon)}</span><span style="flex:1">${label}</span>${ic('right','s')}</a>`).join('')}</div>`:'';
+}
+async function helpS(k){
+if(ME?.role=='client'&&['late','debt'].includes(k))try{const fresh=await api('/api/me');if(fresh.role=='client'){ME=fresh;cui()}}catch{}
+const [t,x]=HELP[k]();await sheet(`<h3>${esc(t)}</h3><p>${esc(x)}</p><button class="btn blk lg" data-x>Понятно</button>`,(o,d)=>{o.querySelector('[data-x]').onclick=()=>d()},null)}
+let CPO=false;
+function clientPayments(R){
+return `<div class=cp><button class=tl onclick="CPO=!CPO;cui()"><span class=gl>${ic('clock')}</span><span style="flex:1">Платежи${R.pays.length?` · ${R.pays.length}`:''}</span><span style="flex:none!important;transform:rotate(${CPO?90:0}deg);transition:transform .2s;display:flex;color:var(--mu)">${ic('right','s')}</span></button></div>
+${!CPO?'':R.pays.length?`<div class=grp style="margin-top:10px">${R.pays.slice().reverse().map(p=>`<div class="row nl" style="cursor:default;min-height:56px"><span class=tx><b>${money2(p.amt)}</b><span>${fmt(p.ts.slice(0,10))} · ${MT[p.method]||p.method}${p.kind=='part'?' · частично':p.kind=='debt'?' · в счёт долга':p.term?' · '+termLabel(p.term):''}${p.discount?` · скидка ${money2(p.discount)}`:''}${p.pen?' · неустойка '+money2(p.pen):''}</span></span></div>`).join('')}</div>`:`<div class=grp>${empty('Платежей пока нет')}</div>`}`
+}
+function cui(){const R=ME.rent;$('#nav').style.display='none';let h=`<div class=chd><small>Аренда электровелосипеда</small><b>${esc(ME.fio||ME.name||'')}</b></div>`;
+if(ME.discount)h+=`<div class="note t-ok">${ic('receipt','s')}<div><b>Вам скидка ${money2(ME.discount.amt)}</b><br>На следующую оплату аренды за любой срок. Применится автоматически, максимум до стоимости аренды.</div></div>`;
+if(!R){h+=ME.debt?`<div class="cn"><div class=mu>Долг по прошлой аренде</div><div class=big style="color:var(--ert)">${m(ME.debt)}</div><div class=mu>Свяжитесь с нами для оплаты.</div></div>`:`<div class=center>${ic('bike','l')}<h1>Аренды сейчас нет</h1><p>Когда вам выдадут велосипед, здесь появятся сроки и оплата.</p></div>`;$('#app').innerHTML=h+CBTN();return}
+if(R.waiting){$('#app').innerHTML=h+`<div class="cn"><div class=mid>Ждём возврата велосипеда</div><div class=mu>Начисления остановлены с ${dshort(R.waiting)}.</div></div>`+clientPayments(R)+CBTN();return}
+const s=R.st,g=ME.grace||0,pen=ME.pen,last=s.late==0&&s.left==0,dlate=s.dlate||0,L=Math.max(s.late,dlate);
+const top=L>0?[(s.pen||s.dpen||s.dl)?'t-er':'t-wa','alert',s.late>0?`Просрочка ${s.late} ${dayWord(s.late)}`:`Долг просрочен на ${dlate} ${dayWord(dlate)}`]:s.dl>0?['t-er','alert',`Долг ${m(s.dl)} — доплатите до ${dshort(s.ddue)}`]:last?['t-wa','clock',s.firstterm?'Сегодня нужно оплатить первый срок':'Сегодня последний оплаченный день']:['t-ok','check',`Оплачено ещё ${s.pdays} ${dayWord(s.pdays)}`];
+if(!(s.dl>0&&L==0))h+=`<div class="cb ${top[0]}"><span class=gl>${ic(top[1])}</span><span style="flex:1">${top[2]}</span>${QB(L>0?(s.late>0?'late':'debt'):s.dl>0?'debt':last?'next':'days')}</div>`;
+for(const b of R.bills||[])h+=`<div class="cn" style="border:2px solid var(--pine)"><div class=mu>Вам выставлен платёж ${b.kind=='debt'?'в счёт долга':'за аренду'}${QB('bill')}</div><div class=big style="margin-top:4px">${m(b.amt)}</div>${ME.qr?`<button class="btn blk" style="margin-top:12px" onclick="cBill('${b.id}')">${ic('receipt','s')}Оплатить по QR</button>`:`<div class=mu>Оплатите, как договорились.</div>`}</div>`;
+if(s.dl>0)h+=`<div class="cn dcard"><div class=mu>${dlate>0?`Долг — срок доплаты был ${dshort(s.ddue)}`:`Долг — доплатить до ${dshort(s.ddue)}`}${QB('debt')}</div><div class=big style="margin-top:4px;color:var(--ert)">${m(s.dl)}</div>
+<div class=mu>${s.dpen?`в том числе неустойка ${m(s.dpen)}`:dlate>0&&!s.nopen?`<b>Неустойка начнётся ${dshort(s.dpfrom)}</b> — ${pen}% от долга за каждый день`:'остаток после частичной оплаты'}</div>
+${ME.qr?`<div class=mu style="margin-top:6px;color:var(--ert);font-weight:650">Сначала оплатите долг</div><button class="btn dng blk" style="margin-top:12px" onclick="cDebt()">${ic('receipt','s')}Доплатить по QR</button>`:''}</div>`;
+h+=`<div class=cn>`;
+if(s.late>0){h+=`<div class=mu>К оплате за аренду${QB('late')}</div><div class=big style="color:var(--${s.pen>0?'ert':'wat'});margin-top:4px">${m(s.rent_due??s.debt)}</div>`;
+ h+=`<div class=mu>${s.pen>0?`в том числе неустойка ${m(s.pen)} — ${pen}% от платежа за каждый день просрочки`:s.nopen||s.defer?'':`<b>Неустойка начнётся ${dshort(s.pfrom)}</b> — ${pen}% от платежа за каждый день. Оплатите до этого дня, чтобы её не было.`}</div>`}
+else{h+=`<div class=mid>${s.firstterm?`Первый срок · ${termLabel(s.firstterm)}`:last?'Оплатите сегодня следующий период':`Следующая оплата ${dshort(s.next)}`}${QB('next')}</div><div class=mu>${s.firstterm?money2(s.nprice)+' · оплатить до '+dshort(s.next):R.terms?.length?'Сумма зависит от выбранного периода':`${m(s.nprice)} за ${TYA[s.ntype]}`}${last?'':' · '+rel(s.left)}${s.dl>0&&!last?` · оплачено ещё ${s.pdays} ${dayWord(s.pdays)}`:''}</div>
+`}
+if(s.defer)h+=`<div class=hint>${ic('clock','s')} Отсрочка без неустойки до ${dshort(s.defer)}</div>`;
+h+=`</div>`;
+if(!s.nopen)h+=`<div class=sub style="margin:6px 26px 0">При просрочке ${g?`первые ${g} ${dayWord(g)} без неустойки, затем `:''}${pen}% от платежа за каждый день.</div>`;
+h+=`<div class=cp>${ME.qr||ME.discount?`<button class=tl onclick="cPay()"><span class=gl>${ic('receipt')}</span><span style="flex:1">${ME.qr?'Оплатить аренду по QR':'Посмотреть оплату со скидкой'}</span>${QB('qr')}${ic('right','s')}</button>`:`<div class="note t-n" style="margin:12px 0 0">${ic('receipt','s')}<div>Оплата по QR скоро появится. Пока оплачивайте так, как договорились.</div></div>`}
+${R.req?`<div class="note t-wa" style="margin:12px 0 0">${ic('clock','s')}<div>Заявка на отсрочку ${R.req.days} ${dayWord(R.req.days)} отправлена. Ждём решения.</div></div>`:ME.cdef>0?`<button class=tl onclick="cReq()"><span class=gl>${ic('clock')}</span><span style="flex:1">Попросить отсрочку</span>${QB('defer')}${ic('right','s')}</button>`:''}</div>${clientPayments(R)}
+${R.return_request?`<div class="cn t-bl"><b>Возврат ${fmt(R.return_request.date)}</b>${QB('returnbike')}<div class=sm>${R.return_request.ack?'Заявка просмотрена':'Заявка отправлена'}. Аренда продолжается до фактического возврата.</div>${R.return_request.note?`<div class=sm>${tx2(R.return_request.note)}</div>`:''}<button class="btn sec blk" style="margin-top:10px" onclick="cReturn()">Изменить или отменить заявку</button></div>`:`<div class=cp><button class=tl onclick="cReturn()"><span class=gl>${ic('flag')}</span><span style="flex:1">Планирую вернуть велосипед</span>${QB('returnbike')}${ic('right','s')}</button></div>`}
+${ME.debt?`<div class="note t-er">${ic('alert','s')}<div>Долг по прошлой аренде: <b>${m(ME.debt)}</b></div></div>`:''}${CBTN()}`;
+$('#app').innerHTML=h}
+async function cAfter(qid,title){await showQR(qid,title,1);ME=await api('/api/me');cui()}
+async function cBill(bid){try{const r=await api('/api/c',{a:'qr',bill:bid});await cAfter(r.qr,'Выставленный платёж')}catch(e){uiAlert(e)}}
+async function cDebt(){try{const r=await api('/api/c',{a:'qr',debtonly:1});await cAfter(r.qr,'Доплата долга')}catch(e){uiAlert(e)}}
+async function qrPeriodS(s,terms,call,onQr,onlyDebt){
+await sheet(`<h3>Оплата аренды</h3><p>QR действует до конца дня.</p><div class=fld><span>Период оплаты</span>${paymentOptions(s,terms)}</div>
+${s.dl>0?`<label class=sw style="padding:14px 0 0"><span class=tx><b>Вместе с долгом ${onlyDebt?'':QB('withdebt')}</b><span>Долг ${money2(s.dl)}</span></span><input type=checkbox id=wd checked></label>`:''}
+<div class=pv><div class=sm>К оплате</div><div class=big id=qa>…</div><div class=sm id=qd></div></div><button class="btn blk lg" data-y disabled>Получить QR</button>
+${s.dl>0&&onlyDebt?'<button class="btn sec blk" data-d>QR только на долг</button>':''}<button class="btn sec blk" data-n>Отмена</button>`,(o,d)=>{
+const y=o.querySelector('[data-y]'),w=o.querySelector('#wd');
+const params=()=>({...selectedPeriod(o),debt:!!w?.checked});
+let seq=0,shown,busy=false;
+const upd=async()=>{const req=++seq;y.disabled=true;
+try{const q=await call('quote',params());if(req!=seq)return;
+shown=q;o.querySelector('#qa').textContent=money2(q.amt);o.querySelector('#qd').textContent=quoteDetails(q);y.textContent=q.amt==0?'Применить скидку':'Получить QR';y.disabled=busy||(ME.role=='client'&&!ME.qr&&q.amt>0)}
+catch(e){if(req==seq){o.querySelector('#qa').textContent='—';o.querySelector('#qd').textContent=e}}};
+wireSeg(o,upd);upd();if(w)w.onchange=upd;o.querySelector('[data-n]').onclick=()=>d();
+const debtBtn=o.querySelector('[data-d]');if(debtBtn)debtBtn.onclick=()=>{d();onlyDebt()};
+y.onclick=async()=>{busy=true;y.disabled=true;
+try{const r=await call('qr',{...params(),expected:shown.amt,expected_quote:shown.stamp});d();if(r.qr)await onQr(r.qr);else{toast('Скидка применена, срок оплачен');if(ME.role=='client'){ME=await api('/api/me');cui()}else await reload()}}
+catch(e){uiAlert(e);busy=false;upd()}}})}
+async function cPay(){
+const R=ME.rent;
+await qrPeriodS(R.st,R.terms,(a,b)=>api('/api/c',{a,...b}),q=>cAfter(q,'Оплата аренды'))
+}
+async function cReturn(){const rq=ME.rent?.return_request,t=TODAY();
+await sheet(`<h3>Возврат велосипеда</h3><p>Укажите планируемую дату. Для согласования времени свяжитесь с нами. Аренда продолжается до фактического возврата велосипеда.</p><label class=fld><span>Дата возврата</span><input id=rd type=date min="${t}" max="${addD(t,365)}" value="${rq?.date||t}"></label><label class=fld><span>Комментарий</span><textarea id=rn maxlength=200 placeholder="Например: смогу приехать вечером">${esc(rq?.note||'')}</textarea></label><button class="btn blk lg" data-y>Отправить заявку</button>${rq?'<button class="btn dng blk" data-cancel>Отменить заявку на возврат</button>':''}<button class="btn sec blk" data-n>Закрыть</button>`,(o,d)=>{o.querySelector('[data-n]').onclick=()=>d();const submit=async cancel=>{const y=o.querySelector('[data-y]');y.disabled=true;try{await api('/api/c',cancel?{a:'return_cancel'}:{a:'return_request',date:o.querySelector('#rd').value,note:o.querySelector('#rn').value});d();ME=await api('/api/me');cui();toast(cancel?'Заявка отменена':'Заявка отправлена')}catch(e){uiAlert(e)}finally{y.disabled=false}};o.querySelector('[data-y]').onclick=()=>submit(false);const cancel=o.querySelector('[data-cancel]');if(cancel)cancel.onclick=()=>submit(true)})}
+async function cReq(){const n=ME.cdef;await sheet(`<h3>Отсрочка</h3><p>Попросите перенести оплату без неустойки. Мы одобрим или отклоним заявку.</p><label class=fld><span>На сколько дней</span>${seg('d',Array.from({length:n},(_,i)=>[i+1,String(i+1)]),Math.min(2,n))}</label>
+<button class="btn blk lg" data-y>Отправить заявку</button><button class="btn sec blk" data-n>Отмена</button>`,(o,d)=>{wireSeg(o);o.querySelector('[data-n]').onclick=()=>d();
+o.querySelector('[data-y]').onclick=async()=>{try{await api('/api/c',{a:'req',days:+segv(o,'d')});d();hap('success');toast('Заявка отправлена');ME=await api('/api/me');cui()}catch(e){uiAlert(e)}}})}
+const startParam=()=>{const u=T.initDataUnsafe||{};if(u.start_param)return u.start_param;const x=(location.search+'&'+location.hash.replace(/^#/,'')).match(/tgWebAppStartParam=([^&]+)/);try{return x?decodeURIComponent(x[1]):''}catch{return ''}};
+async function claim(tok){try{await api('/api/claim',{tok,phone:$('#ph').value});location.reload()}catch(e){uiAlert('Проверьте номер телефона и ссылку. Номер должен совпадать с тем, который вы указали при оформлении аренды.','Не удалось войти')}}
+/* ---------- запуск */
+const SCR={today,park,bike,rent,issue,clients,client,carch,fin:finS,more,unkL,settings,admins,backup,logS};
+SCR.issue.after=()=>{wireSeg($('#issue-form'),isUpd);isUpd()};
+(async()=>{if(!T.initData){$('#app').innerHTML=`<div class=center>${ic('lock','l')}<h1>Откройте в Telegram</h1><p>Приложение работает только внутри Telegram через бота.</p></div>`;return}
+try{ME=await api('/api/me')}catch(e){$('#app').innerHTML=`<div class=center>${ic('alert','l')}<h1>Нет связи</h1><p>Не удалось связаться с сервером. Попробуйте позже.</p></div>`;return}
+if(ME.role=='owner'||ME.role=='admin'){$('#nav').style.display='';await load();render();return}
+$('#nav').style.display='none';
+if(ME.role=='client'){lastLoad=Date.now();return cui()}
+if(ME.role=='off'){$('#app').innerHTML=`<div class=center>${ic('lock','l')}<h1>Доступ отключён</h1><p>Свяжитесь с нами.</p></div>`+CBTN();return}
+const tok=startParam();
+if(/^qq[0-9a-f]{24}$/.test(tok)){$('#app').innerHTML='<div class=spin></div>';try{await api('/api/claim',{tok});location.reload()}catch(e){$('#app').innerHTML=`<div class=center>${ic('alert','l')}<h1>QR устарел</h1><p>Код действует 10 минут и срабатывает один раз. Попросите показать новый.</p></div>`}return}
+$('#app').innerHTML=tok?`<div class=center>${ic('bike','l')}<h1>Вход</h1><p>Введите номер телефона, который вы сообщили при оформлении аренды.</p><div style="text-align:left"><input id=ph type=tel inputmode=tel placeholder="+7 900 000-00-00" autocomplete=tel></div><div class=acts style="margin:16px 0"><button class="btn blk lg" onclick="claim(startParam())">Войти</button></div></div>`:
+`<div class=center>${ic('link','l')}<h1>Нужна ссылка</h1><p>Откройте ссылку для входа, которую вам прислали.</p></div>`+CBTN()})();
+
+</script></body></html>
