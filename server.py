@@ -107,8 +107,10 @@ def who(init):
             if type(uid) is not int or not 0<uid<2**52:return None
             UN[uid]=str(u.get('username') or '')[:40];return uid
     except Exception:pass
-def tg(method,data):
-    return json.load(urllib.request.urlopen(urllib.request.Request(f'{TGB}/bot{TOK}/{method}',json.dumps(data).encode(),{'Content-Type':'application/json'}),timeout=20))
+def tg(method,data,timeout=20):
+    request=urllib.request.Request(f'{TGB}/bot{TOK}/{method}',json.dumps(data).encode(),{'Content-Type':'application/json'})
+    with urllib.request.urlopen(request,timeout=timeout) as response:
+        return json.load(response)
 def _send(chat,t):
     try:tg('sendMessage',{'chat_id':chat,'text':t})
     except Exception as e:print('send',e)
@@ -123,6 +125,206 @@ def botname():
         try:BOT[0]=tg('getMe',{})['result']['username']
         except Exception as e:print('getMe',e)
     return BOT[0]
+
+# ---------- публичное меню бота ----------
+BOT_INFO_CITY='Санкт-Петербург'
+BOT_INFO_DEFAULTS={
+    'name':'ИП Старчевский Максим Юрьевич',
+    'inn':'781154545535',
+    'ogrnip':'323784700210652',
+    'phone':'+79217521054',
+}
+BOT_INFO_SECTIONS={
+    'rates':'Тарифы',
+    'payment':'Как платить',
+    'handover':'Выдача и возврат',
+    'details':'Реквизиты и документы',
+    'contact':'Связаться',
+}
+
+def bot_info_data(settings):
+    saved=settings.get('bot_info') or {}
+    return {**BOT_INFO_DEFAULTS,**{key:value for key,value in saved.items() if value}}
+
+def normalize_bot_info(values):
+    if not isinstance(values,dict):raise Bad('Проверьте сведения для меню бота')
+    info={field:txt(values.get(field),length) for field,length in (
+        ('name',160),('inn',40),('ogrnip',40),('phone',30),('pickup',250),('email',200),('privacy',2048)
+    )}
+    if info['inn'] and not re.fullmatch(r'[0-9]{12}',info['inn']):
+        raise Bad('ИНН ИП должен состоять из 12 цифр')
+    if info['ogrnip'] and not re.fullmatch(r'[0-9]{15}',info['ogrnip']):
+        raise Bad('ОГРНИП должен состоять из 15 цифр')
+    info['phone']=re.sub(r'[()\s-]','',info['phone'])
+    if info['phone'] and not re.fullmatch(r'\+?[0-9]{10,15}',info['phone']):
+        raise Bad('Укажите телефон для связи в боте')
+    if info['email'] and not re.fullmatch(r'[^@\s]+@[^@\s]+\.[^@\s]+',info['email']):
+        raise Bad('Укажите рабочую электронную почту')
+    if info['privacy'] and not chat_url(info['privacy']):
+        raise Bad('Укажите HTTPS-ссылку на политику конфиденциальности')
+    return info
+
+def bot_privacy_policy(info):
+    contact=f'Телефон для связи {info["phone"]}.'
+    if info.get('email'):contact+=f' Рабочая почта {info["email"]}.'
+    return (
+        'Политика обработки персональных данных\n\n'
+        'Кто обрабатывает данные\n'
+        f'Оператор — {info["name"]}, ИНН {info["inn"]}, ОГРНИП {info["ogrnip"]}, {BOT_INFO_CITY}. '
+        'Политика действует для бота и кабинета аренды электровелосипедов «Вольт Вояж». '
+        f'{contact}\n\n'
+        'Какие данные и зачем\n'
+        'Для работы меню бот получает идентификатор чата и выбранную команду. Для входа в кабинет и связи '
+        'используются ФИО, телефон, идентификатор и имя пользователя Telegram. '
+        'Для ведения аренды используются сведения о договоре и велосипеде, даты, суммы и способы оплаты, '
+        'заявки и обращения клиента. Сетевой адрес запроса используется для защиты входа.\n\n'
+        'Основания для обработки\n'
+        'Данные обрабатываются для заключения договора по инициативе клиента, исполнения договора '
+        'и выполнения обязанностей по закону. Когда требуется согласие, оператор запрашивает его отдельно.\n\n'
+        'Кто получает данные\n'
+        'Доступ к кабинету ограничен правами пользователей. Для работы сервиса используются Telegram и хостинг. '
+        'При оплате по СБП банк получает сумму и назначение платежа. Сведения также предоставляются '
+        'уполномоченным органам в предусмотренных законом случаях.\n\n'
+        'Сроки хранения\n'
+        'Данные хранятся на время исполнения договора и в сроки, необходимые для учёта, защиты прав сторон '
+        'и соблюдения закона. По окончании применимых сроков данные подлежат уничтожению или обезличиванию.\n\n'
+        'Как обратиться к оператору\n'
+        'Вы можете запросить сведения об обработке ваших данных, их исправление, блокирование или удаление '
+        'в предусмотренных законом случаях и отозвать ранее данное согласие. '
+        'Свяжитесь с оператором, чтобы направить письменное обращение. '
+        'Для ответа оператор может запросить подтверждение личности.'
+    )
+
+def bot_info_screen(settings,section,username):
+    """Использует общие тарифы и публичные поля. Карточки клиентов не нужны."""
+    info=bot_info_data(settings)
+    links=[]
+    if username and re.fullmatch(r'[a-zA-Z0-9_]{5,32}',username):
+        links.append([{'text':'Открыть кабинет аренды','url':f'https://t.me/{username}?startapp'}])
+    if section=='rates':
+        rates=settings['renewal_rates']
+        amounts='\n'.join(f'{label} — {rub(rates[term])}' for term,label in (
+            ('w','1 неделя'),('w2','2 недели'),('w3','3 недели'),('m','30 дней')
+        ))
+        body=(
+            'Тарифы на аренду электровелосипеда\n\n'
+            'В комплекте два аккумулятора, замок и багажник под термокороб. '
+            'Минимальный срок аренды — 7 дней.\n\n'
+            f'Базовые цены за весь срок:\n{amounts}\n\n'
+            'Сумму за первый срок согласуем при выдаче. Тариф вашей аренды и точную сумму продления видно в кабинете.'
+        )
+    elif section=='payment':
+        body=(
+            'Как оплатить аренду\n\n'
+            'Первый срок оплачивается по условиям, согласованным при выдаче. Для продления '
+            'внесите оплату не позднее последнего оплаченного дня, указанного в кабинете.\n\n'
+            'Откройте кабинет, выберите доступный срок и проверьте сумму. '
+            'Для онлайн-оплаты используйте QR-код СБП или ссылку на оплату в кабинете. '
+            'Если онлайн-оплата недоступна или платёж не отобразился, свяжитесь с нами.'
+        )
+    elif section=='handover':
+        pickup=info.get('pickup')
+        location=f'Место встречи: {pickup}.' if pickup else 'Место встречи сообщим при записи.'
+        body=(
+            'Выдача и возврат\n\n'
+            f'Выдаём и принимаем велосипеды в Санкт-Петербурге по предварительной записи. {location}\n\n'
+            'Чтобы вернуть велосипед, согласуйте с нами время. Если аренда уже оформлена, '
+            'в кабинете можно отправить заявку «Планирую вернуть велосипед».\n\n'
+            'Для возврата денег укажите дату, сумму платежа и причину обращения. '
+            'Проверим платёж и сообщим сумму и срок возврата. Возврат оплаты по СБП оформляем по исходной операции.'
+        )
+    elif section=='details':
+        body=(
+            f'Реквизиты и документы\n\n{info["name"]}\nИНН {info["inn"]}\nОГРНИП {info["ogrnip"]}\n'
+            f'{BOT_INFO_CITY}\nТелефон {info["phone"]}'
+        )
+        privacy=chat_url(info.get('privacy'))
+        action={'url':privacy} if privacy else {'callback_data':'rent_info:privacy'}
+        links.insert(0,[{'text':'Политика обработки данных',**action}])
+    elif section=='privacy':
+        body=bot_privacy_policy(info)
+    elif section=='contact':
+        contacts=contact_data(settings)
+        rows=[f'Телефон {info["phone"]}',f'{BOT_INFO_CITY}. Выдача и возврат по записи.']
+        if info.get('email'):rows.append('Почта '+info['email'])
+        for key,label in (('cmax','Написать в МАКС'),('ctg','Написать в Telegram')):
+            if contacts[key]:links.append([{'text':label,'url':contacts[key]}])
+        body='Связаться с «Вольт Вояж»\n\n'+'\n'.join(rows)
+    else:
+        body=(
+            'Вольт Вояж · аренда электровелосипедов\n\n'
+            'Санкт-Петербург. Минимальный срок — 7 дней. Выберите раздел, чтобы узнать тарифы '
+            'и условия аренды.\n\n'
+            'Для первого входа в личный кабинет используйте персональную ссылку, которую получили при оформлении аренды.'
+        )
+    if section=='menu':
+        actions=[[{'text':label,'callback_data':'rent_info:'+key}] for key,label in BOT_INFO_SECTIONS.items()]
+    else:
+        actions=[[{'text':'В главное меню','callback_data':'rent_info:menu'}]]
+        if section!='contact':actions.append([{'text':'Связаться','callback_data':'rent_info:contact'}])
+        if section=='privacy':actions.insert(0,[{'text':'К реквизитам','callback_data':'rent_info:details'}])
+    return body,{'inline_keyboard':actions+links}
+
+def handle_bot_info(update):
+    callback=update.get('callback_query')
+    if callback:
+        section=callback.get('data','').removeprefix('rent_info:')
+        if callback.get('data')!='rent_info:'+section or section not in {'menu','privacy',*BOT_INFO_SECTIONS}:return
+        message=callback.get('message') or {}
+    else:
+        message=update.get('message') or {}
+        words=message.get('text','').split(maxsplit=1)
+        if not words:return
+        command=words[0]
+        action,_,recipient=command.partition('@')
+        if action not in ('/start','/help'):return
+        if recipient and recipient.casefold()!=(BOT[0] or '').casefold():return
+        section='menu'
+    chat=message.get('chat') or {}
+    if chat.get('type')!='private' or not chat.get('id'):return
+    with L:settings=cfg()
+    body,keyboard=bot_info_screen(settings,section,BOT[0])
+    params={'chat_id':chat['id'],'text':body,'reply_markup':keyboard,
+            'link_preview_options':{'is_disabled':True}}
+    if callback:
+        tg('answerCallbackQuery',{'callback_query_id':callback['id']})
+        tg('editMessageText',{**params,'message_id':message['message_id']})
+    else:tg('sendMessage',params)
+
+def bot_info_job():
+    """Опрос запускается только при отсутствии другого обработчика обновлений."""
+    offset=None
+    checked=False
+    retry=5
+    while True:
+        try:
+            if not checked:
+                webhook=tg('getWebhookInfo',{})['result']
+                if webhook.get('url'):
+                    print('bot info: у бота уже настроен вебхук, опрос не запущен')
+                    return
+                checked=True
+            options={'timeout':25,'allowed_updates':['message','callback_query']}
+            if offset is not None:options['offset']=offset
+            result=tg('getUpdates',options,timeout=35)['result']
+            for update in result:
+                try:handle_bot_info(update)
+                except urllib.error.HTTPError as error:
+                    # Повторное нажатие на ту же кнопку может вернуть 400 при обновлении сообщения.
+                    if error.code!=400:print('bot info: ответ Telegram',error.code)
+                except (OSError,ValueError,KeyError,TypeError) as error:
+                    print('bot info:',type(error).__name__)
+                offset=update['update_id']+1
+            retry=5
+            continue
+        except urllib.error.HTTPError as error:
+            print('bot info: опрос Telegram',error.code)
+            if error.code in (401,404,409):return
+        except (OSError,ValueError,KeyError,TypeError) as error:
+            print('bot info: опрос Telegram',type(error).__name__)
+        time.sleep(retry)
+        retry=min(retry*2,60)
+
 # ---------- расчёт аренды ----------
 # Аренда: start — начало первого оплачиваемого периода; base — периоды, оплаченные до переноса;
 # plan — смены цены/периода с номера периода k; once — цена на один период; defer — отсрочки {from,until}.
@@ -615,6 +817,8 @@ def snapshot(ro,P):
             if ro!='owner' and 'pay_qr' not in P:d.pop('payload',None);d.pop('tid',None)
         out[k][i]=d
     c=cfg();tc=c.pop('tochka',{}) or {}
+    if ro=='owner':c['bot_info']=bot_info_data(c)
+    else:c.pop('bot_info',None)
     c.update(contact_data(c))
     c['tochka']={'on':bool(tq()),'merchant':tc.get('merchant',''),'account':tc.get('account',''),'jwt':bool(tc.get('jwt')),'hook':tc.get('hook','')} if ro=='owner' else {'on':bool(tq())}
     if not fin:c={x:c[x] for x in('week','month','renewal_rates','pen','grace','ddays','cdef','archdays','cats','tochka')}
@@ -1074,6 +1278,7 @@ def act(a,b,ro,P,by):
                 link=chat_url(value,telegram=field=='ctg')
                 if value and not link:raise Bad(f'Укажите действующую HTTPS-ссылку для контакта в {label}')
                 c[field]=link
+        if 'bot_info' in b:c['bot_info']=normalize_bot_info(b['bot_info'])
         c['nown']=bool(b.get('nown',c['nown']));c['ncli']=bool(b.get('ncli',c['ncli']))
         if isinstance(b.get('cats'),list):c['cats']=[txt(x,40) for x in b['cats'] if txt(x,40)][:30] or DEF['cats']
         if isinstance(b.get('tochka'),dict):
@@ -1246,6 +1451,7 @@ def validate_backup(items):
                 if key in d:integer(d[key],0 if key!='ddays' else 1,hi)
             if 'renewal_rates' in d:rate_prices(d['renewal_rates'])
             if 'tochka' in d and not isinstance(d['tochka'],dict):raise Bad('Неверные настройки банка')
+            if 'bot_info' in d:normalize_bot_info(d['bot_info'])
             if 'cats' in d and (not isinstance(d['cats'],list) or not d['cats'] or any(not isinstance(x,str) for x in d['cats'])):
                 raise Bad('Неверные категории расходов')
         if k=='bike':
@@ -1583,4 +1789,6 @@ migrate()
 if __name__=='__main__':
     threading.Thread(target=job,daemon=True).start()
     threading.Thread(target=botname,daemon=True).start()
+    if os.environ.get('BOT_INFO_POLL','1')=='1':
+        threading.Thread(target=bot_info_job,daemon=True).start()
     ThreadingHTTPServer(('',int(os.environ.get('PORT','8080'))),H).serve_forever()
