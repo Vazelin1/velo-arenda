@@ -907,7 +907,10 @@ def mine(cid):
            'pays':[{k:p.get(k) for k in('ts','n','amt','pen','method','kind','term','discount')} for p in d.get('pays') or []][-30:],'req':req,'qr':None if d.get('waiting') else qr,
            'defers':[x for x in d.get('defer') or []][-5:]}
     debt=cash(sum(d.get('debt',0) for _,d in kind('rent') if d.get('client')==cid and d.get('status')!='active'))
-    return {'role':'client','today':str(today()),'name':c.get('name',''),'discount':({'amt':c['discount']['amt']} if c.get('discount') else None),'rent':r,'debt':debt,'cdef':cf['cdef'],'pen':cf['pen'],'grace':cf['grace'],'qr':bool(tq()),'fio':c.get('name',''),**contact_data(cf)}
+    info=bot_info_data(cf)
+    short_name='ИП Старчевский М.Ю.' if info['name']==BOT_INFO_DEFAULTS['name'] else info['name']
+    operator={'name':short_name,'inn':info['inn'],'ogrnip':info['ogrnip'],'city':BOT_INFO_CITY}
+    return {'role':'client','today':str(today()),'name':c.get('name',''),'discount':({'amt':c['discount']['amt']} if c.get('discount') else None),'rent':r,'debt':debt,'cdef':cf['cdef'],'pen':cf['pen'],'grace':cf['grace'],'qr':bool(tq()),'fio':c.get('name',''),'operator':operator,**contact_data(cf)}
 # ---------- действия ----------
 NEED={'issue':'rent_issue','return':'rent_return','waitreturn':'rent_return','rates':'rent_rates','rentnote':'rent_note',
       'price':'rent_rates','contract':'rent_contract','fix':'rent_date','seize':'seize','returnack':'rent_return',
