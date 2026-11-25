@@ -2,10 +2,13 @@
 Вся бизнес-логика (периоды, неустойка, отсрочки, оплаты, возвраты) считается здесь, интерфейс только показывает и вызывает действия."""
 import os,re,json,hmac,hashlib,sqlite3,threading,time,secrets,urllib.request,urllib.error,urllib.parse,datetime as dt
 from decimal import Decimal,ROUND_HALF_UP,InvalidOperation
+from html import escape
 from http.server import ThreadingHTTPServer,BaseHTTPRequestHandler
+from pathlib import Path
 TOK=os.environ['BOT_TOKEN'];OWNER=int(os.environ['OWNER_ID'])
 MSK=dt.timezone(dt.timedelta(hours=3));L=threading.RLock()
 DATA=os.environ.get('DATA_DIR','/data');BK=DATA+'/backups';os.makedirs(BK,exist_ok=True)
+STATIC_DIR=Path(__file__).resolve().with_name('static')
 TGB=os.environ.get('TG_BASE','https://api.telegram.org')
 TQB=os.environ.get('TOCHKA_BASE','https://enter.tochka.com/uapi');MOCK=os.environ.get('TOCHKA_MOCK')=='1'
 db=sqlite3.connect(DATA+'/app.db',check_same_thread=False)
@@ -128,6 +131,9 @@ def botname():
 
 # ---------- публичное меню бота ----------
 BOT_INFO_CITY='Санкт-Петербург'
+PRIVACY_TITLE='Политика обработки персональных данных'
+PRIVACY_PATH='/privacy'
+PRIVACY_URL='https://rent.volt-voyaj.ru'+PRIVACY_PATH
 BOT_INFO_DEFAULTS={
     'name':'ИП Старчевский Максим Юрьевич',
     'inn':'781154545535',
@@ -164,40 +170,60 @@ def normalize_bot_info(values):
         raise Bad('Укажите HTTPS-ссылку на политику конфиденциальности')
     return info
 
-def bot_privacy_policy(info):
-    contact=f'Телефон для связи {info["phone"]}.'
-    if info.get('email'):contact+=f' Рабочая почта {info["email"]}.'
-    return (
-        'Политика обработки персональных данных\n\n'
-        'Кто обрабатывает данные\n'
-        f'Оператор — {info["name"]}, ИНН {info["inn"]}, ОГРНИП {info["ogrnip"]}, {BOT_INFO_CITY}. '
-        'Политика действует для бота и кабинета аренды электровелосипедов «Вольт Вояж». '
-        f'{contact}\n\n'
-        'Какие данные и зачем\n'
-        'Для работы меню бот получает идентификатор чата и выбранную команду. Для входа в кабинет и связи '
-        'используются ФИО, телефон, идентификатор и имя пользователя Telegram. '
-        'Для ведения аренды используются сведения о договоре и велосипеде, даты, суммы и способы оплаты, '
-        'заявки и обращения клиента. Сетевой адрес запроса используется для защиты входа.\n\n'
-        'Основания для обработки\n'
-        'Данные обрабатываются для заключения договора по инициативе клиента, исполнения договора '
-        'и выполнения обязанностей по закону. Когда требуется согласие, оператор запрашивает его отдельно.\n\n'
-        'Кто получает данные\n'
-        'Доступ к кабинету ограничен правами пользователей. Для работы сервиса используются Telegram и хостинг. '
-        'При оплате по СБП банк получает сумму и назначение платежа. Сведения также предоставляются '
-        'уполномоченным органам в предусмотренных законом случаях.\n\n'
-        'Сроки хранения\n'
-        'Данные хранятся на время исполнения договора и в сроки, необходимые для учёта, защиты прав сторон '
-        'и соблюдения закона. По окончании применимых сроков данные подлежат уничтожению или обезличиванию.\n\n'
-        'Как обратиться к оператору\n'
-        'Вы можете запросить сведения об обработке ваших данных, их исправление, блокирование или удаление '
-        'в предусмотренных законом случаях и отозвать ранее данное согласие. '
-        'Свяжитесь с оператором, чтобы направить письменное обращение. '
-        'Для ответа оператор может запросить подтверждение личности.'
-    )
+def privacy_paragraphs(info):
+    email=f' Рабочая почта {info["email"]}.' if info.get('email') else ''
+    text=(STATIC_DIR/'privacy.txt').read_text(encoding='utf-8').strip()
+    return [part.format(name=info['name'],inn=info['inn'],ogrnip=info['ogrnip'],city=BOT_INFO_CITY,
+                        phone=info['phone'],email=email) for part in text.split('\n\n')]
 
-def bot_info_screen(settings,section,username):
+def privacy_page(info):
+    body=''.join(
+        f'<h2>{escape(part[3:])}</h2>' if part.startswith('## ') else f'<p>{escape(part)}</p>'
+        for part in privacy_paragraphs(info)
+    )
+    return f'''<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{PRIVACY_TITLE} · Вольт Вояж</title>
+<style>
+    :root {{color-scheme:light; background:#f1f2ee; color:#1f2b28; font:16px/1.6 system-ui,sans-serif}}
+    body {{margin:0; padding:clamp(12px,4vw,44px)}}
+    main {{box-sizing:border-box; max-width:760px; margin:auto; padding:clamp(20px,5vw,48px);
+        border-radius:24px; background:#fff; overflow-wrap:anywhere}}
+    header p {{margin:0; color:#2f5d50; font-weight:750}}
+    h1 {{font-size:clamp(1.55rem,5vw,2.3rem); line-height:1.15; margin:.35em 0 .8em}}
+    h2 {{font-size:1.1rem; line-height:1.35; margin:1.45em 0 .45em}}
+    p {{margin:.55em 0}}
+</style>
+</head>
+<body>
+<main><header><p>Вольт Вояж</p><h1>{PRIVACY_TITLE}</h1></header>{body}</main>
+</body>
+</html>'''
+
+def privacy_bot_pages(info,limit=3200):
+    pages=[]
+    page=''
+    for paragraph in privacy_paragraphs(info):
+        part=paragraph.removeprefix('## ')
+        if page and len(page)+len(part)+2>limit:
+            pages.append(page)
+            page=''
+        while len(part)>limit:
+            end=part.rfind(' ',0,limit+1)
+            if end<=0:end=limit
+            pages.append(part[:end])
+            part=part[end:].lstrip()
+        page+=('\n\n' if page else '')+part
+    if page:pages.append(page)
+    return pages
+
+def bot_info_screen(settings,section,username,index=0):
     """Использует общие тарифы и публичные поля. Карточки клиентов не нужны."""
     info=bot_info_data(settings)
+    actions=[]
     links=[]
     if username and re.fullmatch(r'[a-zA-Z0-9_]{5,32}',username):
         links.append([{'text':'Открыть кабинет аренды','url':f'https://t.me/{username}?startapp'}])
@@ -238,11 +264,22 @@ def bot_info_screen(settings,section,username):
             f'Реквизиты и документы\n\n{info["name"]}\nИНН {info["inn"]}\nОГРНИП {info["ogrnip"]}\n'
             f'{BOT_INFO_CITY}\nТелефон {info["phone"]}'
         )
-        privacy=chat_url(info.get('privacy'))
-        action={'url':privacy} if privacy else {'callback_data':'rent_info:privacy'}
-        links.insert(0,[{'text':'Политика обработки данных',**action}])
+        actions.append([{'text':'Политика обработки данных','callback_data':'rent_info:privacy'}])
+        actions.append([{'text':'Читать политику в браузере','url':PRIVACY_URL}])
+        published_copy=chat_url(info.get('privacy'))
+        if published_copy and published_copy!=PRIVACY_URL:
+            actions.append([{'text':'Копия политики на сайте','url':published_copy}])
     elif section=='privacy':
-        body=bot_privacy_policy(info)
+        pages=privacy_bot_pages(info)
+        index=min(index,len(pages)-1)
+        caption=f' · {index+1} из {len(pages)}' if len(pages)>1 else ''
+        body=f'{PRIVACY_TITLE}{caption}\n\n{pages[index]}'
+        navigation=[]
+        if index:navigation.append({'text':'← Назад','callback_data':f'rent_info:privacy:{index-1}'})
+        if index+1<len(pages):
+            navigation.append({'text':'Дальше →','callback_data':f'rent_info:privacy:{index+1}'})
+        if navigation:actions.append(navigation)
+        actions.append([{'text':'К реквизитам','callback_data':'rent_info:details'}])
     elif section=='contact':
         contacts=contact_data(settings)
         rows=[f'Телефон {info["phone"]}',f'{BOT_INFO_CITY}. Выдача и возврат по записи.']
@@ -258,18 +295,23 @@ def bot_info_screen(settings,section,username):
             'Для первого входа в личный кабинет используйте персональную ссылку, которую получили при оформлении аренды.'
         )
     if section=='menu':
-        actions=[[{'text':label,'callback_data':'rent_info:'+key}] for key,label in BOT_INFO_SECTIONS.items()]
+        actions.extend([{'text':label,'callback_data':'rent_info:'+key}] for key,label in BOT_INFO_SECTIONS.items())
     else:
-        actions=[[{'text':'В главное меню','callback_data':'rent_info:menu'}]]
+        actions.append([{'text':'В главное меню','callback_data':'rent_info:menu'}])
         if section!='contact':actions.append([{'text':'Связаться','callback_data':'rent_info:contact'}])
-        if section=='privacy':actions.insert(0,[{'text':'К реквизитам','callback_data':'rent_info:details'}])
     return body,{'inline_keyboard':actions+links}
 
 def handle_bot_info(update):
     callback=update.get('callback_query')
+    index=0
     if callback:
-        section=callback.get('data','').removeprefix('rent_info:')
-        if callback.get('data')!='rent_info:'+section or section not in {'menu','privacy',*BOT_INFO_SECTIONS}:return
+        data=callback.get('data','')
+        if not data.startswith('rent_info:'):return
+        section,sep,page=data.removeprefix('rent_info:').partition(':')
+        if section not in {'menu','privacy',*BOT_INFO_SECTIONS}:return
+        if sep:
+            if section!='privacy' or not re.fullmatch(r'[0-9]{1,6}',page):return
+            index=int(page)
         message=callback.get('message') or {}
     else:
         message=update.get('message') or {}
@@ -283,7 +325,7 @@ def handle_bot_info(update):
     chat=message.get('chat') or {}
     if chat.get('type')!='private' or not chat.get('id'):return
     with L:settings=cfg()
-    body,keyboard=bot_info_screen(settings,section,BOT[0])
+    body,keyboard=bot_info_screen(settings,section,BOT[0],index)
     params={'chat_id':chat['id'],'text':body,'reply_markup':keyboard,
             'link_preview_options':{'is_disabled':True}}
     if callback:
@@ -1574,6 +1616,9 @@ class H(BaseHTTPRequestHandler):
         return u
     def do_GET(s):
         p=s.path.split('?')[0].split('#')[0]
+        if p==PRIVACY_PATH:
+            with L:info=bot_info_data(cfg())
+            return s.send(200,privacy_page(info).encode('utf-8'),'text/html; charset=utf-8',{'Cache-Control':'no-cache'})
         if p in('/api/all','/api/me','/api/log'):
             u=s.user()
             if u is None:return s.send(403,{})
@@ -1620,10 +1665,10 @@ class H(BaseHTTPRequestHandler):
         if p.startswith('/dl/'):return send_backup(s,p[4:])
         f={'/':'index.html'}.get(p)
         if not f:return s.send(404,b'')
-        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)),'static',f),'rb') as page:
-            s.send(200,page.read(),'text/html; charset=utf-8',{'Cache-Control':'no-cache'})
+        s.send(200,(STATIC_DIR/f).read_bytes(),'text/html; charset=utf-8',{'Cache-Control':'no-cache'})
     def do_HEAD(s):
         p=s.path.split('?')[0]
+        if p==PRIVACY_PATH:return s.do_GET()
         if p.startswith('/dl/'):return send_backup(s,p[4:],metadata_only=True)
         return s.send(404,b'')
     def do_POST(s):
