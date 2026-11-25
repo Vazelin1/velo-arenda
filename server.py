@@ -29,11 +29,13 @@ LEGACY_PERMS={
     'clients':('client_edit','client_archive','client_block','client_access'),
     'bikes':('bike_edit','bike_status'),
 }
+GRACE_DAYS=2
+PARTIAL_PAYMENT_DAYS=2
 BASE_TERMS=('w','m')
 TERM_DAYS={'w':7,'w2':14,'w3':21,'m':30}
 DEFAULT_RATES={'w':3700,'w2':7300,'w3':10800,'m':15000}
 DEF={'week':DEFAULT_RATES['w'],'month':DEFAULT_RATES['m'],'renewal_rates':DEFAULT_RATES,
-'pen':5,'grace':2,'ddays':3,'archdays':30,'cphone':'','ctg':'','cmax':'','tax':7,'acq':0,'receipt':0,'cdef':3,'nown':False,'ncli':False,
+'pen':5,'grace':GRACE_DAYS,'archdays':30,'cphone':'','ctg':'','cmax':'','tax':7,'acq':0,'receipt':0,'cdef':0,'nown':False,'ncli':False,
 'cats':['Ремонт','Запчасти','Обслуживание','Реклама','Зарплата','Аренда помещения','Прочее']}
 ID=re.compile(r'[a-z0-9]{1,16}')
 D=dt.date.fromisoformat
@@ -51,7 +53,7 @@ def num(x,lo=0,hi=10**8):
     try:v=Decimal(str(x))
     except (InvalidOperation,ValueError):raise Bad('Неверное число')
     if not v.is_finite():raise Bad('Неверное число')
-    if not lo<=v<=hi:raise Bad('Число вне допустимого диапазона')
+    if not Decimal(str(lo))<=v<=Decimal(str(hi)):raise Bad('Число вне допустимого диапазона')
     return cash(v)
 def integer(x,lo=0,hi=400):
     try:v=Decimal(str(x))
@@ -98,7 +100,7 @@ def write_log(action,by,i,old=None,new=None):
 def put(i,k,d,act,who,old=None,audit=None):
     d['_v']=(old or {}).get('_v',0)+1;save(i,k,d)
     write_log(act,who,i,old,{**d,'_audit':audit} if audit else d)
-def cfg():return {**DEF,**(doc('cfg') or {})}
+def cfg():return {**DEF,**(doc('cfg') or {}),'grace':GRACE_DAYS,'cdef':0}
 # ---------- Telegram ----------
 def who(init):
     try:
@@ -177,12 +179,14 @@ def privacy_paragraphs(info):
     return [part.format(name=info['name'],inn=info['inn'],ogrnip=info['ogrnip'],city=BOT_INFO_CITY,
                         phone=info['phone'],email=email) for part in text.split('\n\n')]
 
-def privacy_page(info):
-    body=''.join(
+def privacy_body(info):
+    return ''.join(
         f'<h2>{escape(part[3:])}</h2>' if part.startswith('## ') else f'<p>{escape(part)}</p>'
         for part in privacy_paragraphs(info)
     )
-    return public_page(PRIVACY_TITLE,body)
+
+def privacy_page(info):
+    return public_page(PRIVACY_TITLE,privacy_body(info))
 
 def public_page(title,body):
     return f'''<!doctype html>
@@ -203,6 +207,8 @@ def public_page(title,body):
     nav {{display:flex; flex-wrap:wrap; gap:.4rem 1rem; margin:1.25rem 0}}
     a {{color:#2f5d50; text-underline-offset:3px}}
     section {{border-top:1px solid #e2e8e3; padding-bottom:.75rem}}
+    .policy {{margin-top:1rem; border-top:1px solid #e2e8e3; padding-top:1rem}}
+    .policy summary {{cursor:pointer; font-weight:700; color:#2f5d50}}
 </style>
 </head>
 <body>
@@ -316,10 +322,13 @@ def rental_info_page(settings):
         paragraphs=''.join(f'<p>{escape(part).replace(chr(10),"<br>")}</p>' for part in copy.split('\n\n'))
         sections.append(f'<section id="{key}"><h2>{escape(heading)}</h2>{paragraphs}</section>')
     navigation=''.join(f'<a href="#{key}">{escape(label)}</a>' for key,label in BOT_INFO_SECTIONS.items())
-    phone=escape(bot_info_data(settings)['phone'])
+    info=bot_info_data(settings)
+    phone=escape(info['phone'])
+    policy=(f'<details class="policy" id="privacy"><summary>{PRIVACY_TITLE}</summary>'
+            +privacy_body(info)+f'<p><a href="{PRIVACY_PATH}">Открыть отдельной страницей</a></p></details>')
     body=(f'<p>Санкт-Петербург. Выдача и возврат по записи.</p><p><a href="tel:{phone}">Позвонить {phone}</a></p>'
-          f'<nav aria-label="Разделы">{navigation}<a href="{PRIVACY_PATH}">{PRIVACY_TITLE}</a></nav>'
-          +''.join(sections))
+          f'<nav aria-label="Разделы">{navigation}</nav>'
+          +''.join(sections)+policy)
     return public_page('Аренда электровелосипедов',body)
 
 def handle_bot_info(update):
@@ -454,8 +463,8 @@ def due_of(r,k,s):
 def pen(r,due,price,on):
     """Неустойка за период с днём оплаты due на дату on: ставка% от цены периода за каждый день просрочки,
     начиная с (льгота+1)-го дня. Не считаются дни отсрочки, списанные дни и аренды с отключённой неустойкой."""
-    c=cfg();g=int(c.get('grace',2));n=charged_days(r,due+dt.timedelta(days=g+1),on)
-    return percent(price,c['pen'],n),n
+    n=charged_days(r,due+dt.timedelta(days=GRACE_DAYS+1),on)
+    return percent(price,cfg()['pen'],n),n
 def owed(r,on,cnt=None):
     """Неоплаченные периоды, начиная с первого. cnt=None: все, чей день оплаты наступил (минимум один); иначе ровно cnt."""
     k=paidn(r)+1;s=pstart(r,k);out=[]
@@ -485,16 +494,27 @@ def rstate(r,on=None):
             'late':max(0,(on-nd).days),'left':(nd-on).days,
             'pen':cash(sum(x['pen'] for x in du)),'debt':accrued,'rent_due':cash(accrued-discount),
             'due_total':cash(accrued-discount+debts['dl_due']),'due_n':len(du),'defer':df,'paid':paidn(r),
-            'until':str(D(n['start'])-dt.timedelta(days=1)),'pdays':max(0,(D(n['start'])-on).days),'pfrom':str(nd+dt.timedelta(days=int(cfg().get('grace',2))+1)),'nopen':bool(r.get('nopen')),
+            'until':str(D(n['start'])-dt.timedelta(days=1)),'pdays':max(0,(D(n['start'])-on).days),'pfrom':str(nd+dt.timedelta(days=GRACE_DAYS+1)),'nopen':bool(r.get('nopen')),
             **debts}
 # Долг активной аренды (частичная оплата): r['dl'] — список {id,amt,due,pen,pdate}. pen — уже начисленная и зафиксированная неустойка,
 # pdate — день последней фиксации (дальше неустойка считается с pdate+1).
+def partial_debt_due(due, paid_on):
+    """Доплата через два дня в пределах первых четырёх дней просрочки."""
+    if paid_on > due + dt.timedelta(days=GRACE_DAYS):
+        return paid_on
+    return max(due, paid_on) + dt.timedelta(days=PARTIAL_PAYMENT_DAYS)
+
+def debt_penalty_start(debt):
+    if debt.get('pen_from'):
+        return D(debt['pen_from'])
+    # Для долгов из старых версий сохраняем срок начисления, согласованный при оплате.
+    return D(debt['due']) + dt.timedelta(days=GRACE_DAYS+1)
+
 def daccr(r,it,on):
     """Неустойка по долгу, набежавшая после последней фиксации: ставка% от остатка за каждый день после срока и льготных дней."""
-    c=cfg();g=int(c.get('grace',2))
-    d=D(it['due'])+dt.timedelta(days=g+1)
+    d=debt_penalty_start(it)
     if it.get('pdate'):d=max(d,D(it['pdate'])+dt.timedelta(days=1))
-    return percent(it['amt'],c['pen'],charged_days(r,d,on))
+    return percent(it['amt'],cfg()['pen'],charged_days(r,d,on))
 def dstate(r,on):
     its=r.get('dl') or []
     if not its:return {'dl':0,'dl_due':0,'dpen':0,'dprin':0}
@@ -502,7 +522,7 @@ def dstate(r,on):
     pen=cash(sum(penalties));amt=cash(sum(it['amt'] for it in its));due=min(D(it['due']) for it in its)
     due_amount=sum(it['amt']+pe for it,pe in zip(its,penalties) if D(it['due'])<=on)
     return {'dl':cash(amt+pen),'dl_due':cash(due_amount),'dpen':pen,'dprin':amt,'ddue':str(due),'dlate':max(0,(on-due).days),
-            'dpfrom':str(due+dt.timedelta(days=int(cfg().get('grace',2))+1))}
+            'dpfrom':str(min(debt_penalty_start(it) for it in its))}
 def pay_dl(r,amt,on):
     """Гасит долг суммой amt: сначала фиксирует неустойку, затем гасит неустойку и сам долг (самые ранние первыми). Возвращает остаток."""
     its=sorted(r.get('dl') or [],key=lambda x:x['due'])
@@ -513,22 +533,29 @@ def pay_dl(r,amt,on):
     r['dl']=[it for it in its if it['amt']>0.005 or it['pen']>0.005]
     return amt
 def add_dl(r,amt,due,by,pe=0):
-    r.setdefault('dl',[]).append({'id':nid(),'amt':cash(amt),'orig':cash(amt),'due':str(due),'pen':cash(pe),'ts':now().isoformat(timespec='seconds'),'by':by})
-def ledger(r):return json.loads(json.dumps({'status':r.get('status'),'dl':r.get('dl') or [],'debt':r.get('debt',0)}))
+    r.setdefault('dl',[]).append({'id':nid(),'amt':cash(amt),'orig':cash(amt),'due':str(due),
+                                 'pen_from':str(due+dt.timedelta(days=1)),
+                                 'pen':cash(pe),'ts':now().isoformat(timespec='seconds'),'by':by})
+def ledger(r):
+    state={'status':r.get('status'),'dl':r.get('dl') or [],'debt':r.get('debt',0)}
+    if r.get('debt_pen'):state['debt_pen']=r['debt_pen']
+    return json.loads(json.dumps(state))
 def payment_undo(r,p,before):
     after=ledger(r)
     if before!=after:p['undo']={'before':before,'after':after}
 def legacy_undo(rid,p,current):
-    """Для старых частичных оплат восстанавливаем точные состояния из журнала, не угадывая остаток."""
+    """Берём остатки долга до и после старой оплаты из журнала."""
     for old,new in db.execute('select old,new from log where id=? order by rowid desc',(rid,)):
         try:
             a=json.loads(old);b=json.loads(new)
             added=(b.get('pays') or [])[len(a.get('pays') or []):]
-            if p in added and sum(x.get('kind') in ('part','debt') for x in added)==1 and ledger(b)==current:
+            if (p in added and sum(x.get('kind') in ('part','debt') for x in added)==1
+                    and ledger(b)==current):
                 return {'before':ledger(a),'after':ledger(b)}
         except (TypeError,ValueError,AttributeError):pass
     return None
-def apply_money(r,kind_,amt,method,by,due=None,qr=None,on=None):
+
+def apply_money(r,kind_,amt,method,by,qr=None,on=None):
     """Зачисляет деньги по выставленному платежу. kind_='period': за следующий период (меньше полной суммы — частичная оплата, остаток в долг);
     'debt': в счёт долга. Возвращает лишнее (если заплатили больше, чем нужно)."""
     on=on or today()
@@ -537,8 +564,9 @@ def apply_money(r,kind_,amt,method,by,due=None,qr=None,on=None):
         q=quote(r,1,on)
         if amt+0.005<q['amt']:
             paid_pen=min(amt,q['pen'])
-            p=addpay(r,1,amt,paid_pen,method,by,qr,kind='part')
-            add_dl(r,q['rent_amt']-(amt-paid_pen),due or on+dt.timedelta(days=int(cfg()['ddays'])),by,q['pen']-paid_pen)
+            p=addpay(r,1,amt,paid_pen,method,by,qr,kind='part',discount_info=q)
+            due=partial_debt_due(D(q['items'][0]['pay']),on)
+            add_dl(r,q['rent_amt']-(amt-paid_pen),due,by,q['pen']-paid_pen)
             payment_undo(r,p,before);return 0
         addpay(r,1,q['amt'],q['pen'],method,by,qr);amt=cash(amt-q['amt'])
         if amt<=0.005:return 0
@@ -548,6 +576,16 @@ def apply_money(r,kind_,amt,method,by,due=None,qr=None,on=None):
         paid_pen=cash(before_pen-dstate(r,on)['dpen'])
         p=addpay(r,0,cash(amt-left),paid_pen,method,by,qr,kind='debt');payment_undo(r,p,before)
     return left
+def pay_closed_debt(r,amt,method,by,qr=None,ts=None):
+    before=ledger(r)
+    paid_pen=min(amt,r.get('debt_pen',0))
+    payment=addpay(r,0,amt,paid_pen,method,by,qr,ts=ts,kind='debt')
+    r['debt']=cash(r['debt']-amt)
+    remaining_pen=cash(r.get('debt_pen',0)-paid_pen)
+    if remaining_pen:r['debt_pen']=remaining_pen
+    else:r.pop('debt_pen',None)
+    payment_undo(r,payment,before)
+
 def pending_discount(r):
     return (doc(r.get('client')) or {}).get('discount') or {}
 def discounted(r,q):
@@ -597,6 +635,7 @@ def term_quote(r,n,term=None,on=None):
         rent_amt=q['amt']-pe
     q=discounted(r,{'amt':cash(rent_amt+pe),'pen':cash(pe),'from':str(start),'to':str(end-dt.timedelta(days=1))})
     q['weekly']=cash(Decimal(str(q['rent_amt']))*7/days)
+    q['partial_due']=str(partial_debt_due(due_of(r,paidn(r)+1,start),on))
     return q
 def quote_stamp(q):
     return {key:q.get(key) for key in ('amt','pen','from','to','discount','discount_id')}
@@ -745,7 +784,7 @@ def new_qr(rid,r,n,by,debt=False,bill=None,term=None,expected=None,expected_quot
         q=term_quote(r,n,term,on);amt=q['amt'];pe=q['pen']
         if debt:dp=dstate(r,on)['dl'];amt+=dp
     elif r.get('status')=='active':amt=dstate(r,on)['dl'];dp=amt
-    else:amt=r.get('debt',0)
+    else:amt=r.get('debt',0);pe=r.get('debt_pen',0)
     amt=cash(amt)
     check_amount({'expected':expected,'expected_quote':expected_quote},amt,{**q,'amt':amt} if q else None)
     if amt<=0:
@@ -779,7 +818,7 @@ def on_paid(qid,q):
         b=doc(q['bill'])
         same_quote=not q.get('quote') or q['quote']==quote_stamp(term_quote(r,1))
         if b and b.get('status')=='open' and b['amt']==q['amt'] and bill_current(r,b) and same_quote and q['date']==str(t):
-            apply_money(r,b['kind'],q['amt'],'qr','СБП',D(b['due']) if b.get('due') else None,qid,on=t)
+            apply_money(r,b['kind'],q['amt'],'qr','СБП',qr=qid,on=t)
             ob=dict(b);b['status']='paid';b['paid']=now().isoformat(timespec='seconds');put(q['bill'],'bill',b,'bill-paid','',ob);ok=True
     elif act_ and q['n'] and str(t)==q['date'] and period_qr_current(r,q,t):
         dp=q.get('dpart',0)
@@ -789,7 +828,7 @@ def on_paid(qid,q):
     elif act_ and not q.get('bill') and not q['n'] and q.get('dpart') and r.get('dl') and q['date']==str(t):
         apply_money(r,'debt',cash(q['amt']),'qr','СБП',qr=qid,on=t);ok=True
     elif r and not cancelled and not q.get('bill') and not q.get('dpart') and not q['n'] and r.get('status')!='active' and cash(r.get('debt',0))==q['amt']:
-        before=ledger(r);p=addpay(r,0,q['amt'],0,'qr','СБП',qid,kind='debt');r['debt']=0;payment_undo(r,p,before);ok=True
+        pay_closed_debt(r,q['amt'],'qr','СБП',qid);ok=True
     credited=0
     if ok:
         # Один банковский платёж может содержать аренду и доплату. Округляем удержания по всей операции.
@@ -884,7 +923,7 @@ def snapshot(ro,P):
     else:c.pop('bot_info',None)
     c.update(contact_data(c))
     c['tochka']={'on':bool(tq()),'merchant':tc.get('merchant',''),'account':tc.get('account',''),'jwt':bool(tc.get('jwt')),'hook':tc.get('hook','')} if ro=='owner' else {'on':bool(tq())}
-    if not fin:c={x:c[x] for x in('week','month','renewal_rates','pen','grace','ddays','cdef','archdays','cats','tochka')}
+    if not fin:c={x:c[x] for x in('week','month','renewal_rates','pen','grace','cdef','archdays','cats','tochka')}
     result={'docs':out,'cfg':c,'today':str(t)}
     if fin:result['forecast']=receipt_forecast(t)
     if ro=='owner':
@@ -892,25 +931,24 @@ def snapshot(ro,P):
         result.update(backup={'ts':reminder['last']} if reminder['last'] else None,backup_reminder=reminder)
     return result
 def mine(cid):
-    c=doc(cid) or {};a=active_of('client',cid);cf=cfg()
+    c=doc(cid) or {};a=active_of('client',cid);cf=cfg();t=today()
     r=None
     if a:
-        i,d=a;st=rstate(d)
-        req=next(({'days':x['days'],'ts':x['ts']} for _,x in kind('req') if x.get('rent')==i and x.get('status')=='pending'),None)
-        q1=quote(d,1)
+        i,d=a;st=rstate(d,t)
+        q1=quote(d,1,t)
         qr=next(({'id':j,'amt':x['amt'],'n':x['n'],'payload':x['payload'],'img':x.get('img')}
-                 for j,x in kind('qr') if x.get('rent')==i and qr_available(d,x,today())),None)
-        bills=[{'id':j,'amt':x['amt'],'kind':x['kind'],'due':x.get('due'),'ts':x['ts']}
-               for j,x in kind('bill') if x.get('rent')==i and x.get('status')=='open' and not d.get('waiting') and bill_current(d,x)]
+                 for j,x in kind('qr') if x.get('rent')==i and qr_available(d,x,t)),None)
+        bills=[{'id':j,'amt':x['amt'],'kind':x['kind'],'ts':x['ts'],
+                'partial_due':str(partial_debt_due(D(st['next']),t)) if x['kind']=='period' and x['amt']<q1['amt'] else None}
+               for j,x in kind('bill') if x.get('rent')==i and x.get('status')=='open' and not d.get('waiting') and bill_current(d,x,t)]
         r={'id':i,'issued':d.get('issued'),'type':d['type'],'st':st,'q1':q1['amt'],'bills':bills,
            'waiting':d.get('waiting'),'terms':list(d.get('rates') or {}),'return_request':d.get('return_request'),
-           'pays':[{k:p.get(k) for k in('ts','n','amt','pen','method','kind','term','discount')} for p in d.get('pays') or []][-30:],'req':req,'qr':None if d.get('waiting') else qr,
-           'defers':[x for x in d.get('defer') or []][-5:]}
+           'pays':[{k:p.get(k) for k in('ts','n','amt','pen','method','kind','term','discount')} for p in d.get('pays') or []][-30:],'qr':None if d.get('waiting') else qr}
     debt=cash(sum(d.get('debt',0) for _,d in kind('rent') if d.get('client')==cid and d.get('status')!='active'))
     info=bot_info_data(cf)
     short_name='ИП Старчевский М.Ю.' if info['name']==BOT_INFO_DEFAULTS['name'] else info['name']
     operator={'name':short_name,'inn':info['inn'],'ogrnip':info['ogrnip'],'city':BOT_INFO_CITY}
-    return {'role':'client','today':str(today()),'name':c.get('name',''),'discount':({'amt':c['discount']['amt']} if c.get('discount') else None),'rent':r,'debt':debt,'cdef':cf['cdef'],'pen':cf['pen'],'grace':cf['grace'],'qr':bool(tq()),'fio':c.get('name',''),'operator':operator,**contact_data(cf)}
+    return {'role':'client','today':str(t),'name':c.get('name',''),'discount':({'amt':c['discount']['amt']} if c.get('discount') else None),'rent':r,'debt':debt,'cdef':cf['cdef'],'pen':cf['pen'],'grace':cf['grace'],'qr':bool(tq()),'fio':c.get('name',''),'operator':operator,**contact_data(cf)}
 # ---------- действия ----------
 NEED={'issue':'rent_issue','return':'rent_return','waitreturn':'rent_return','rates':'rent_rates','rentnote':'rent_note',
       'price':'rent_rates','contract':'rent_contract','fix':'rent_date','seize':'seize','returnack':'rent_return',
@@ -956,6 +994,7 @@ def act(a,b,ro,P,by):
     """Выполняет действие главного аккаунта или администратора. Возвращает ответ (dict). Вызывать под замком."""
     if a in OWNERONLY and ro!='owner':raise PermissionError
     if ro=='admin' and a in NEED and NEED[a] not in P:raise PermissionError
+    if a in ('defer','req'):raise Bad('Новые отсрочки отключены.')
     if ro=='admin' and a=='quote' and not QUOTE_PERMS.intersection(P):raise PermissionError
     if a not in NEED and a not in OWNERONLY and a!='quote':raise Bad('Неизвестное действие')
     if a=='discount':
@@ -1141,9 +1180,7 @@ def act(a,b,ro,P,by):
             amt=num(b.get('amt'),0.01);q=term_quote(r,1,on=t)
             check_amount(b,q['amt'],q)
             if amt+0.005>=q['amt']:raise Bad('Это полная сумма — примите обычную оплату')
-            du=day(b.get('due') or t+dt.timedelta(days=int(cfg()['ddays'])))
-            if du<t:raise Bad('Срок доплаты уже прошёл')
-            apply_money(r,'period',amt,m,by,du,on=t)
+            apply_money(r,'period',amt,m,by,on=t)
             void_bills(i,by,period_only=True);close_requests(i,by)
             put(i,'rent',r,'paypart',by,o);return {'debt':cash(q['amt']-amt)}
         if a=='paydl':
@@ -1159,17 +1196,14 @@ def act(a,b,ro,P,by):
                 q=quote(r,1)
                 if amt>q['amt']+0.005:raise Bad(f"Платёж за период {rub(q['amt'])}, больше выставить нельзя")
                 if amt+0.005<q['amt'] and ro=='admin' and 'partial' not in P:raise PermissionError
-                du=day(b.get('due') or t+dt.timedelta(days=int(cfg()['ddays'])))
-                if du<t:raise Bad('Срок доплаты уже прошёл')
             elif k=='debt':
                 tot=dstate(r,t)['dl']
                 if not tot:raise Bad('Долга нет')
                 if amt>tot+0.005:raise Bad(f'Долг всего {rub(tot)}')
-                du=None
             else:raise Bad('Выберите, за что платёж')
             for j,x in kind('bill'):
                 if x.get('rent')==i and x.get('status')=='open':raise Bad('У клиента уже есть неоплаченный выставленный платёж. Отмените его или отметьте оплату.')
-            bi=nid();put(bi,'bill',{'rent':i,'client':r['client'],'kind':k,'amt':amt,'due':str(du) if du else None,'status':'open','ts':now().isoformat(timespec='seconds'),'by':by,
+            bi=nid();put(bi,'bill',{'rent':i,'client':r['client'],'kind':k,'amt':amt,'status':'open','ts':now().isoformat(timespec='seconds'),'by':by,
                 'base':paidn(r),'discount_id':q.get('discount_id') if k=='period' else None,
                 'quote':quote_stamp(term_quote(r,1)) if k=='period' else None},'bill',by)
             tell(r['client'],f'Вам выставлен платёж {rub(amt)}. Оплатить можно в приложении.');return {'id':bi}
@@ -1181,13 +1215,14 @@ def act(a,b,ro,P,by):
             if not bill_current(r,x):raise Bad('Условия платежа изменились. Выставьте платёж заново.')
             m=b.get('method')
             if m not in('cash','transfer'):raise Bad('Выберите способ оплаты')
-            left=apply_money(r,x['kind'],x['amt'],m,by,D(x['due']) if x.get('due') else None)
+            left=apply_money(r,x['kind'],x['amt'],m,by,on=t)
             if x['kind']=='period':close_requests(i,by)
             x['status']='paid';x['paid']=now().isoformat(timespec='seconds');put(j,'bill',x,'bill-paid',by,ox);put(i,'rent',r,'billpaid',by,o);return {'left':left}
         if a=='paydebt':
             if act_ or not r.get('debt'):raise Bad('Долга нет')
             m=b.get('method') if b.get('method') in('cash','transfer','qr') else 'cash'
-            before=ledger(r);p=addpay(r,0,r['debt'],0,m,by,kind='debt');r['debt']=0;payment_undo(r,p,before);put(i,'rent',r,'paydebt',by,o);return {}
+            pay_closed_debt(r,r['debt'],m,by)
+            put(i,'rent',r,'paydebt',by,o);return {}
         if a=='qr':
             if b.get('bill'):
                 j,x=get('bill',b['bill'])
@@ -1220,7 +1255,11 @@ def act(a,b,ro,P,by):
                 ci,c=get('client',r['client']);old=json.loads(json.dumps(c))
                 if c.get('discount'):raise Bad('Сначала отмените новую скидку клиента, чтобы восстановить скидку удаляемой оплаты.')
                 c['discount']=payment['discount_offer'];put(ci,'client',c,'discount-restored',by,old)
-            if undo:r['dl']=undo['before']['dl'];r['debt']=undo['before']['debt']
+            if undo:
+                previous=undo['before']
+                r.update(dl=previous['dl'],debt=previous['debt'])
+                if previous.get('debt_pen'):r['debt_pen']=previous['debt_pen']
+                else:r.pop('debt_pen',None)
             ps.pop(k);void_bills(i,by,period_only=True);put(i,'rent',r,'paydel',by,o);return {}
         if a=='price':
             p=num(b.get('price'),1);k=paidn(r)+1;ty=b.get('type') or plan(r,k)[0]
@@ -1232,27 +1271,26 @@ def act(a,b,ro,P,by):
                 set_plan(r,k,ty,p,t,by)
                 r.get('once',{}).pop(str(k),None)
             put(i,'rent',r,'price',by,o);return {}
-        if a=='defer':
-            u=day(b.get('until'))
-            if u<t:raise Bad('Дата уже прошла')
-            r.setdefault('defer',[]).append({'from':str(t),'until':str(u),'by':by,'ts':now().isoformat(timespec='seconds')})
-            put(i,'rent',r,'defer',by,o);tell(r['client'],f'Вам дана отсрочка без неустойки до {dm(u)}.');return {}
         if a=='nopen':
-            on=bool(b.get('on'))
-            if on!=bool(r.get('nopen')):
-                pauses=r.setdefault('pen_pauses',[])
-                if on:pauses.append({'from':str(t+dt.timedelta(days=1))})
-                else:
-                    if not pauses:pauses.append({'from':r['start']})
-                    for pause in pauses:
-                        if not pause.get('until'):pause['until']=str(t-dt.timedelta(days=1))
-                r['nopen']=on
+            if b.get('on'):raise Bad('Можно списать уже начисленную неустойку в карточке аренды.')
+            if not r.get('nopen'):return {}
+            pauses=r.setdefault('pen_pauses',[]) or [{'from':r['start']}]
+            yesterday=str(t-dt.timedelta(days=1))
+            r['pen_pauses']=[{**pause,'until':pause.get('until') or yesterday}
+                             for pause in pauses if pause.get('until') or pause['from']<=yesterday]
+            r['nopen']=False
             put(i,'rent',r,'nopen',by,o);return {}
         if a=='waive':
-            st=rstate(r,t);amt=st['pen']+st['dpen'];r['waive']=str(t);r.setdefault('waived',[]).append({'date':str(t),'amt':amt,'by':by})
+            st=rstate(r,t);amt=cash(st['pen']+st['dpen'])
+            if not amt:return {'amt':0}
+            r['waive']=str(t);r.setdefault('waived',[]).append({'date':str(t),'amt':amt,'by':by})
             for it in r.get('dl') or []:it['pen']=0;it['pdate']=str(t)
             r['dl']=[it for it in r.get('dl') or [] if it['amt']>0.005]
-            put(i,'rent',r,'waive',by,o);return {'amt':amt}
+            put(i,'rent',r,'waive',by,o)
+            for j,q in kind('qr'):
+                if q.get('rent')==i and q.get('status')=='open' and not qr_available(r,q,t):
+                    put(j,'qr',{**q,'status':'void'},'qr-void',by,q)
+            return {'amt':amt}
         if a=='undefer':
             yesterday=str(t-dt.timedelta(days=1))
             r['defer']=[{**x,'until':min(x['until'],yesterday)} for x in r.get('defer') or [] if D(x['from'])<t]
@@ -1273,7 +1311,13 @@ def act(a,b,ro,P,by):
         st=rstate({**r,'waiting':r.get('waiting') or str(t)},t)
         if a=='return':
             debt=num(b.get('debt') or 0);ref=num(b.get('refund') or 0)
-            r.update(status='closed',closed=str(t),debt=debt,refund={'amt':ref,'date':str(t)} if ref else None,debt0=cash(st['debt']+st['dl']),dl=[])
+            accrued=cash(st['pen']+st['dpen'])
+            total_debt=cash(st['debt']+st['dl'])
+            debt_pen=b.get('debt_pen')
+            if debt_pen in (None,''):debt_pen=accrued if debt==total_debt else 0
+            debt_pen=num(debt_pen,0,min(debt,accrued))
+            r.update(status='closed',closed=str(t),debt=debt,refund={'amt':ref,'date':str(t)} if ref else None,debt0=total_debt,dl=[])
+            if debt_pen:r['debt_pen']=debt_pen
             r.pop('return_request',None)
             void_bills(i,by);close_requests(i,by)
             put(i,'rent',r,'return',by,o);return {}
@@ -1306,27 +1350,12 @@ def act(a,b,ro,P,by):
                     void_bills(ri,by,period_only=True);close_requests(ri,by)
             else:
                 if u['amt']>r.get('debt',0):raise Bad('Поступление больше остатка долга. Проверьте сумму.')
-                before=ledger(r)
-                payment=addpay(r,0,u['amt'],0,'qr',by,qr,ts=u['ts'],kind='debt')
-                r['debt']=cash(r['debt']-u['amt'])
-                payment_undo(r,payment,before)
+                pay_closed_debt(r,u['amt'],'qr',by,qr,ts=u['ts'])
             if u.get('fees'):r['pays'][-1]['fees']=u['fees']
             put(ri,'rent',r,'unk-apply',by,ro_);u['status']='applied';u['to']=ri
         elif b.get('do')=='done':u['status']='done';u['note']=txt(b.get('note'),200)
         else:raise Bad('Укажите, как разобрать платёж')
         put(i,'unk',u,'unk',by,o);return {}
-    if a=='req':
-        i,q=get('req',b.get('id'));o=dict(q)
-        if q.get('status')!='pending':raise Bad('Заявка уже рассмотрена')
-        ri,r=get('rent',q['rent'])
-        upcoming=rstate(r,t).get('next')
-        if b.get('ok') and upcoming and not r.get('waiting') and q.get('base',paidn(r))==paidn(r) and q.get('due',upcoming)==upcoming:
-            ro_=json.loads(json.dumps(r));ns=D(rstate(r,t)['next'])
-            u=max(ns,t)+dt.timedelta(days=q['days'])
-            r.setdefault('defer',[]).append({'from':str(t),'until':str(u),'by':by,'ts':now().isoformat(timespec='seconds'),'req':i})
-            put(ri,'rent',r,'defer',by,ro_);q['status']='ok';q['until']=str(u);tell(r['client'],f'Отсрочка одобрена: без неустойки до {dm(u)}.')
-        else:q['status']='no';tell(r['client'],'Заявка на отсрочку отклонена.')
-        q['by']=by;put(i,'req',q,'req',by,o);return {}
     if a=='cfg':
         old=doc('cfg');c=cfg();o=json.loads(json.dumps(old or {}))
         if 'renewal_rates' in b:
@@ -1335,8 +1364,9 @@ def act(a,b,ro,P,by):
         else:
             for k in ('week','month'):c[k]=num(b.get(k,c[k]),1)
         for k in ('pen','tax','acq','receipt'):c[k]=num(b.get(k,c[k]),0,100)
-        for key,low,high in (('cdef',0,3),('grace',0,10),('ddays',1,60),('archdays',0,365)):
-            c[key]=integer(b.get(key,c[key]),low,high)
+        for key,high in (('cdef',3),('grace',10)):
+            if key in b:integer(b[key],0,high)
+        c['archdays']=integer(b.get('archdays',c['archdays']),0,365)
         c['cphone']=txt(b.get('cphone',c['cphone']),30)
         for field,label in (('ctg','Telegram'),('cmax','МАКС')):
             if field in b:
@@ -1406,14 +1436,7 @@ def client_act(cid,b):
         if term:n=1
         return {'qr':new_qr(i,r,n,'клиент',debt=bool(b.get('debt')),term=term,
                             expected=b.get('expected'),expected_quote=b.get('expected_quote'))}
-    if b.get('a')=='req':
-        mx=cfg()['cdef']
-        if not mx:raise Bad('Заявки на отсрочку отключены')
-        n=integer(b.get('days',0),1,mx)
-        if any(x.get('rent')==i and x.get('status')=='pending' for _,x in kind('req')):raise Bad('Заявка уже отправлена')
-        put(nid(),'req',{'rent':i,'client':cid,'days':n,'base':paidn(r),'due':rstate(r)['next'],
-                         'ts':now().isoformat(timespec='seconds'),'status':'pending'},'req-new','клиент')
-        say(f"Заявка на отсрочку: {(doc(cid) or {}).get('name','')}, {n} дн. Одобрите или отклоните в приложении.");return {}
+    if b.get('a')=='req':raise Bad('Заявки на отсрочку отключены.')
     raise Bad('Неизвестное действие')
 # ---------- копии ----------
 def dump():
@@ -1530,6 +1553,9 @@ def validate_backup(items):
             if not ID.fullmatch(str(d['discount']['id'])):raise Bad('Неверная скидка')
         if k=='rent':
             if d.get('status') not in ('active','closed','seized') or d.get('type') not in BASE_TERMS:raise Bad('Неверная аренда')
+            if 'debt_pen' in d:
+                amount(d['debt_pen'])
+                if d['debt_pen']>d.get('debt',0):raise Bad('Неустойка превышает долг')
             if d.get('status')=='active':
                 ref(d['bike'],'bike');ref(d['client'],'client')
                 date(d['start'])
@@ -1562,9 +1588,16 @@ def validate_backup(items):
             for it in d.get('dl') or []:
                 amount(it['amt']);amount(it.get('pen',0));date(it['due'])
                 if it.get('pdate'):date(it['pdate'])
+                if it.get('pen_from'):
+                    date(it['pen_from'])
+                    if D(it['pen_from'])!=D(it['due'])+dt.timedelta(days=1):
+                        raise Bad('Неверная дата начисления неустойки по долгу')
             for it in d.get('defer') or []:
                 date(it['from']);date(it['until'])
                 if it['from']>it['until']:raise Bad('Неверная отсрочка')
+            periods=d.get('deferred_periods',[])
+            if not isinstance(periods,list) or any(type(n) is not int or n<1 for n in periods):
+                raise Bad('Неверный период отсрочки')
             for it in d.get('pen_pauses') or []:
                 date(it['from'])
                 if it.get('until'):date(it['until'])
@@ -1685,17 +1718,24 @@ class H(BaseHTTPRequestHandler):
                 return s.send(200,out)
         if p.startswith('/img/'):
             t=time.time()
-            for a in [a for a,(e,_) in IMG.items() if e<t]:IMG.pop(a,None)
-            x=IMG.get(p[5:])
+            with L:
+                for a in [a for a,(e,_) in IMG.items() if e<t]:IMG.pop(a,None)
+                x=IMG.get(p[5:])
             if not x:return s.send(404,b'')
-            return s.send(200,x[1],'image/png',{'Content-Disposition':'attachment; filename="qr-oplata.png"','Cache-Control':'no-store'})
+            disposition='inline' if s.path.partition('?')[2]=='view=1' else 'attachment'
+            return s.send(200,x[1],'image/png',{
+                'Content-Disposition':f'{disposition}; filename="qr-oplata.png"',
+                'Access-Control-Allow-Origin':'https://web.telegram.org',
+                'Access-Control-Expose-Headers':'Content-Disposition',
+                'Cache-Control':'no-store',
+            })
         if p.startswith('/dl/'):return send_backup(s,p[4:])
         f={'/':'index.html'}.get(p)
         if not f:return s.send(404,b'')
         s.send(200,(STATIC_DIR/f).read_bytes(),'text/html; charset=utf-8',{'Cache-Control':'no-cache'})
     def do_HEAD(s):
         p=s.path.split('?')[0]
-        if p in (PRIVACY_PATH,INFO_PATH):return s.do_GET()
+        if p in (PRIVACY_PATH,INFO_PATH) or p.startswith('/img/'):return s.do_GET()
         if p.startswith('/dl/'):return send_backup(s,p[4:],metadata_only=True)
         return s.send(404,b'')
     def do_POST(s):
@@ -1725,8 +1765,11 @@ class H(BaseHTTPRequestHandler):
             try:png=base64.b64decode(str(b.get('png','')).split(',')[-1],validate=True)
             except Exception:return s.send(400,{})
             if not png.startswith(b'\x89PNG') or len(png)>400000:return s.send(400,{})
-            if len(IMG)>200:IMG.clear()
-            k=secrets.token_urlsafe(16);IMG[k]=(t+600,png);return s.send(200,{'url':'/img/'+k})
+            k=secrets.token_urlsafe(16)
+            with L:
+                if len(IMG)>200:IMG.clear()
+                IMG[k]=(t+600,png)
+            return s.send(200,{'url':'/img/'+k})
         if u==OWNER and p=='/api/dl':
             token=secrets.token_urlsafe(16)
             filename=f'arenda-{now():%Y-%m-%d-%H%M}.json'
@@ -1810,8 +1853,7 @@ def morning(t):
         rs=[(i,r,rstate(r,t)) for i,r in kind('rent') if r.get('status')=='active' and not r.get('waiting')]
         if cf['nown'] and once(f'{t}:daily'):
             late=sum(1 for _,_,s in rs if s['late']>0);due=sum(1 for _,_,s in rs if s['left']==0)
-            rq=sum(1 for _,x in kind('req') if x.get('status')=='pending')
-            out.append((OWNER,f'Сегодня платят: {due}. Просрочено: {late}.'+(f' Заявок на отсрочку: {rq}.' if rq else '')))
+            out.append((OWNER,f'Сегодня платят: {due}. Просрочено: {late}.'))
         if cf['ncli']:
             for i,r,s in rs:
                 if s['left'] in(0,1) and once(f"{t}:rem:{i}:{s['next']}"):
@@ -1843,6 +1885,9 @@ def migrate(commit=True):
     """Перенесённые аренды: день оплаты = дата окончания в старом сервисе (новый период начинается на день позже).
     Настройки: неустойка 5% с 3-го дня, если льгота ещё не задана."""
     with L:
+        for i,q in kind('req'):
+            if q.get('status')=='pending':
+                put(i,'req',{**q,'status':'no'},'req','',q)
         for i,r in kind('rent'):
             if r.get('imported') and not r.get('m1'):
                 o=dict(r);r['m1']=1
