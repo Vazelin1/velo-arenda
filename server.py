@@ -133,6 +133,7 @@ def botname():
 
 # ---------- публичное меню бота ----------
 BOT_INFO_CITY='Санкт-Петербург'
+PUBLIC_PICKUP_ADDRESS='Санкт-Петербург, ул. Коллонтай, д. 52, корп. 2'
 PRIVACY_TITLE='Политика обработки персональных данных'
 PRIVACY_PATH='/privacy'
 INFO_PATH='/info'
@@ -250,27 +251,34 @@ def bot_info_screen(settings,section,username,index=0):
             'В комплекте два аккумулятора, замок и багажник под термокороб. '
             'Минимальный срок аренды — 7 дней.\n\n'
             f'Базовые цены за весь срок:\n{amounts}\n\n'
-            'Сумму за первый срок согласуем при выдаче. Тариф вашей аренды и точную сумму продления видно в кабинете.'
+            'Стоимость первого периода согласуем до подписания договора. Тариф вашей аренды и точную сумму продления видно в кабинете.'
         )
     elif section=='payment':
         body=(
             'Как оплатить аренду\n\n'
-            'Первый срок оплачивается по условиям, согласованным при выдаче. Для продления '
-            'внесите оплату не позднее последнего оплаченного дня, указанного в кабинете.\n\n'
+            'Первый период оплачивается при выдаче велосипеда после подписания письменного договора. '
+            'Срок и стоимость первого периода указываются в договоре. Продление можно оплатить '
+            'до окончания текущего оплаченного периода.\n\n'
             'Откройте кабинет, выберите доступный срок и проверьте сумму. '
             'Для онлайн-оплаты используйте QR-код СБП или ссылку на оплату в кабинете. '
             'Если онлайн-оплата недоступна или платёж не отобразился, свяжитесь с нами.'
         )
     elif section=='handover':
-        pickup=info.get('pickup')
-        location=f'Место встречи: {pickup}.' if pickup else 'Место встречи сообщим при записи.'
+        pickup=info.get('pickup') or PUBLIC_PICKUP_ADDRESS
         body=(
             'Выдача и возврат\n\n'
-            f'Выдаём и принимаем велосипеды в Санкт-Петербурге по предварительной записи. {location}\n\n'
-            'Чтобы вернуть велосипед, согласуйте с нами время. Если аренда уже оформлена, '
-            'в кабинете можно отправить заявку «Планирую вернуть велосипед».\n\n'
-            'Для возврата денег укажите дату, сумму платежа и причину обращения. '
-            'Проверим платёж и сообщим сумму и срок возврата. Возврат оплаты по СБП оформляем по исходной операции.'
+            f'Бесплатный самовывоз по предварительной записи. Адрес выдачи — {pickup.rstrip(".")}. '
+            'Доставки нет. При выдаче вместе с вами проверим исправность велосипеда и объясним правила эксплуатации.\n\n'
+            'Если планы изменились до выдачи, позвоните, чтобы отменить запись. Для досрочного возврата '
+            'согласуйте время сдачи. Заявку также можно отправить из кабинета кнопкой «Планирую вернуть велосипед». '
+            'Для одностороннего отказа от договора проката письменно предупредите нас не менее чем за 10 дней. '
+            'По соглашению сторон велосипед можно сдать раньше.\n\n'
+            'При досрочном возврате возвращаем оплату за оставшиеся оплаченные дни, начиная со дня, следующего '
+            'за фактическим возвратом велосипеда. Сумма возврата равна стоимости оплаченного периода, '
+            'делённой на число дней в нём и умноженной на число неиспользованных дней. '
+            'Если оплачено 7 дней и велосипед сдан на третий день, возвращаем 4/7 оплаченной суммы.\n\n'
+            f'По возврату оплаты свяжитесь с нами по телефону {info["phone"]}. '
+            'Укажите номер договора, дату и сумму платежа. Возврат оплаты по СБП оформляем по исходной операции.'
         )
     elif section=='details':
         body=(
@@ -314,12 +322,33 @@ def bot_info_screen(settings,section,username,index=0):
         if section!='contact':actions.append([{'text':'Связаться','callback_data':'rent_info:contact'}])
     return body,{'inline_keyboard':actions+links}
 
+RENTAL_DOCUMENTS={
+    '/rental-agreement':('Типовой договор проката','rental-agreement.txt'),
+    '/data-consent':('Согласие на обработку персональных данных','data-consent.txt'),
+}
+
+def rental_document_page(path,info):
+    title,filename=RENTAL_DOCUMENTS[path]
+    copy=(STATIC_DIR/filename).read_text(encoding='utf-8').strip()
+    _,_,copy=copy.partition('\n\n')
+    operator=f'{info["name"]}, ИНН {info["inn"]}, ОГРНИП {info["ogrnip"]}. Телефон {info["phone"]}.'
+    intro=('Образец для ознакомления. Индивидуальные условия заполняются при подписании.'
+           if path=='/rental-agreement' else 'Образец отдельного согласия. Открытие страницы не означает его предоставления.')
+    sections=''.join(f'<p>{escape(part).replace(chr(10),"<br>")}</p>' for part in copy.split('\n\n'))
+    return public_page(title,f'<p>{intro}</p><p>{escape(operator)}</p>{sections}'
+                            f'<p><a href="{PRIVACY_PATH}">{PRIVACY_TITLE}</a></p>'
+                            f'<p><a href="{INFO_PATH}">Условия проката</a></p>')
+
 def rental_info_page(settings):
     sections=[]
     for key in BOT_INFO_SECTIONS:
         message,_=bot_info_screen(settings,key,None)
         heading,_,copy=message.partition('\n\n')
         paragraphs=''.join(f'<p>{escape(part).replace(chr(10),"<br>")}</p>' for part in copy.split('\n\n'))
+        if key=='details':
+            documents=''.join(f'<li><a href="{path}">{title}</a></li>'
+                              for path,(title,_) in RENTAL_DOCUMENTS.items())
+            paragraphs+=f'<ul>{documents}<li><a href="{PRIVACY_PATH}">{PRIVACY_TITLE}</a></li></ul>'
         sections.append(f'<section id="{key}"><h2>{escape(heading)}</h2>{paragraphs}</section>')
     navigation=''.join(f'<a href="#{key}">{escape(label)}</a>' for key,label in BOT_INFO_SECTIONS.items())
     info=bot_info_data(settings)
@@ -1676,6 +1705,9 @@ class H(BaseHTTPRequestHandler):
         if p==PRIVACY_PATH:
             with L:info=bot_info_data(cfg())
             return s.send(200,privacy_page(info).encode('utf-8'),'text/html; charset=utf-8',{'Cache-Control':'no-cache'})
+        if p in RENTAL_DOCUMENTS:
+            with L:info=bot_info_data(cfg())
+            return s.send(200,rental_document_page(p,info).encode('utf-8'),'text/html; charset=utf-8',{'Cache-Control':'no-cache'})
         if p==INFO_PATH:
             with L:settings=cfg()
             return s.send(200,rental_info_page(settings).encode('utf-8'),'text/html; charset=utf-8',{'Cache-Control':'no-cache'})
@@ -1735,7 +1767,7 @@ class H(BaseHTTPRequestHandler):
         s.send(200,(STATIC_DIR/f).read_bytes(),'text/html; charset=utf-8',{'Cache-Control':'no-cache'})
     def do_HEAD(s):
         p=s.path.split('?')[0]
-        if p in (PRIVACY_PATH,INFO_PATH) or p.startswith('/img/'):return s.do_GET()
+        if p in (PRIVACY_PATH,INFO_PATH) or p in RENTAL_DOCUMENTS or p.startswith('/img/'):return s.do_GET()
         if p.startswith('/dl/'):return send_backup(s,p[4:],metadata_only=True)
         return s.send(404,b'')
     def do_POST(s):
