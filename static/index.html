@@ -1282,7 +1282,7 @@ return bk()+hd('Настройки')+`<div class=form><h3>Тарифы по ум
 <div class=sub>Ставки применяются к новым оплатам. Все удержания входят в строку «Комиссии».</div></details>
 <h3>Категории расходов</h3><textarea id=sc rows=6>${esc(c.cats.join('\n'))}</textarea><div class=sub style="margin:6px 4px">По одной на строке.</div>
 <h3>Оплата по QR (Точка)</h3><div class="note ${t.on?'t-ok':'t-wa'}" style="margin:8px 0">${ic(t.on?'check':'alert','s')}<div>${t.on?'Подключено: QR выставляются, оплаты отмечаются сами.':'Не подключено. Пока оплату отмечаете вручную.'}</div></div>
-${f('tm','ID торговой точки (merchantId)',t.merchant||'','text')}${f('ta','ID счёта (accountId)',t.account||'','text')}<label class=fld><span>JWT-токен из интернет-банка Точки</span><input id=tj type=password placeholder="${t.jwt?'сохранён — оставьте пустым, чтобы не менять':'вставьте токен'}"></label>
+${f('tm','ID торговой точки (merchantId)',t.merchant||'','text')}${f('ta','ID счёта (accountId)',t.account||'','text')}<button type="button" class="btn sec" onclick="findTochkaAccount(this)">Найти счёт</button><label class=fld><span>JWT-токен из интернет-банка Точки</span><input id=tj type=password placeholder="${t.jwt?'сохранён — оставьте пустым, чтобы не менять':'вставьте токен'}"></label>
 ${t.hook?`<div class=sub style="margin:8px 4px">Адрес для вебхука в Точке: <br><b style="word-break:break-all">${esc(location.origin+'/hook/tochka/'+t.hook)}</b></div>`:''}
 <h3>Контакты для клиентов</h3>${f('scp','Телефон',c.cphone||'','tel')}${f('scm','Ссылка на чат в МАКСе',c.cmax||'','url')}${f('sct','Ссылка на чат в Telegram',c.ctg||'','url')}
 ${botInfoSettings(c.bot_info||{})}
@@ -1290,6 +1290,17 @@ ${botInfoSettings(c.bot_info||{})}
 <label class=sw><span class=tx><b>Напоминания клиентам</b><span>Накануне и в день оплаты, в 10:00</span></span><input type=checkbox id=nc ${c.ncli?'checked':''}></label></div>
 <div class=sub style="margin:0 4px">Пока сервер не может достучаться до Telegram, сообщения не доходят. Приложение от этого не зависит.</div>
 <button class="btn blk lg" style="margin-top:20px" onclick="saveCfg(this)">Сохранить</button></div>`}
+async function findTochkaAccount(button){
+    const field=$('#ta');
+    button.disabled=true;
+    try{
+        const {accounts}=await api('/api/tochka/accounts',{});
+        if(!accounts.length){uiAlert('Точка не вернула счета, доступные этому токену.');return}
+        const account=await uiPick('Выберите расчётный счёт',accounts);
+        if(account&&field.isConnected){field.value=account;toast('Счёт подставлен. Нажмите «Сохранить».')}
+    }catch(e){uiAlert(String(e))}
+    finally{button.disabled=false}
+}
 async function saveCfg(el){
 const q=s=>$(s).value,inputs=$('#default-rates').querySelectorAll('[data-rate]');
 const invalid=[...inputs].find(input=>!input.checkValidity());
