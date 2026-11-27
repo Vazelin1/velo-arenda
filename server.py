@@ -264,7 +264,7 @@ def bot_info_screen(settings,section,username,index=0):
             'Срок и стоимость первого периода указываются в договоре. Продление можно оплатить '
             'до окончания текущего оплаченного периода.\n\n'
             'Откройте кабинет, выберите доступный срок и проверьте сумму. '
-            'Для онлайн-оплаты используйте QR-код СБП или ссылку на оплату в кабинете. '
+            'Для онлайн-оплаты откройте платёжную страницу Точка Банка из кабинета и выберите доступный способ: карту или СБП. '
             'Если онлайн-оплата недоступна или платёж не отобразился, свяжитесь с нами.'
         )
     elif section=='handover':
@@ -282,7 +282,7 @@ def bot_info_screen(settings,section,username,index=0):
             'делённой на число дней в нём и умноженной на число неиспользованных дней. '
             'Если оплачено 7 дней и велосипед сдан на третий день, возвращаем 4/7 оплаченной суммы.\n\n'
             f'По возврату оплаты свяжитесь с нами по телефону {info["phone"]}. '
-            'Укажите номер договора, дату и сумму платежа. Возврат оплаты по СБП оформляем по исходной операции.'
+            'Укажите номер договора, дату и сумму платежа. Возврат онлайн-оплаты оформляем по исходной операции.'
         )
     elif section=='details':
         body=(
@@ -882,14 +882,13 @@ def receipt_forecast(on=None,days=30):
     seven=on+dt.timedelta(days=6)
     return {'from':str(on),'to':str(end),'rows':rows,'total7':cash(sum(x['amt'] for x in rows if x['date']<=str(seven))),
             'total30':cash(sum(x['amt'] for x in rows)),'overdue':cash(overdue),'closed_debt':cash(closed_debt),'skipped':skipped}
-# ---------- Точка (СБП) ----------
+# ---------- Интернет-эквайринг Точки ----------
 POLL=threading.Lock()
-# Подключение: в Настройках вписываются JWT-токен, ID торговой точки (merchantId) и ID счёта (accountId).
-# Запросы сделаны по открытому API Точки (раздел СБП); при подключении сверяем с актуальной документацией.
+# Интернет-эквайринг Точки: JWT, customerCode и при необходимости merchantId.
 def tq():
     t=cfg().get('tochka') or {}
     if MOCK:return {'mock':1,**t}
-    return t if t.get('jwt') and t.get('merchant') and t.get('account') else None
+    return t if t.get('jwt') and t.get('customer') and t.get('modes') else None
 def tochka(method,path,body=None):
     with L:t=tq()
     if not t:raise Bad('Оплата по QR не подключена')
@@ -903,57 +902,64 @@ def tochka_request(jwt,method,path,body=None):
         context.load_verify_locations(cafile=str(bank_ca))
     with urllib.request.urlopen(rq,timeout=25,context=context) as response:
         return json.load(response)
-def tochka_accounts():
+def tochka_customers():
     with L:
         jwt=(cfg().get('tochka') or {}).get('jwt')
-    if not jwt:raise Bad('Сначала сохраните JWT в настройках.')
+    if not jwt:raise Bad('Сначала сохраните JWT.')
     try:
-        data=tochka_request(jwt,'GET','/open-banking/v1.0/accounts')['Data']
+        data=tochka_request(jwt,'GET','/open-banking/v1.0/customers')['Data']
+        rows=next(value for key,value in data.items()
+                  if key.lower() in ('customer','customers') and isinstance(value,list))
     except urllib.error.HTTPError as e:
-        if e.code==401:raise Bad('Точка вернула HTTP 401. Проверьте срок действия JWT.') from None
-        if e.code==403:raise Bad('Точка вернула HTTP 403. Проверьте в интернет-банке доступ JWT к чтению счетов.') from None
-        raise Bad(f'Точка вернула HTTP {e.code} при запросе списка счетов.') from None
-    except urllib.error.URLError as e:
-        if isinstance(e.reason,ssl.SSLCertVerificationError):
-            raise Bad('Сервер аренды не доверяет сертификату Точки. Проверьте сертификаты в контейнере.') from None
-        raise Bad('Сервер аренды не смог соединиться с API Точки или дождаться ответа.') from None
-    except TimeoutError:
-        raise Bad('API Точки не ответил вовремя.') from None
-    except OSError:
-        raise Bad('Соединение с API Точки прервалось.') from None
-    except (ValueError,KeyError,TypeError):
-        raise Bad('Точка ответила, но в ответе нет данных списка счетов.') from None
-    if isinstance(data,dict):
-        # В списке и в старом формате шлюза ключ коллекции отличается регистром и числом.
-        rows=next((value for key,value in data.items()
-                   if key.lower() in ('account','accounts') and isinstance(value,list)),None)
-    else:
-        rows=data
-    if not isinstance(rows,list):
-        raise Bad('Точка ответила, но приложение не распознало формат списка счетов.')
-    return list(dict.fromkeys(row['accountId'] for row in rows if isinstance(row,dict)
-                              and isinstance(row.get('accountId'),str) and 0<len(row['accountId'])<=40))
+        if e.code==403:raise Bad('Точка запретила чтение кода клиента. Проверьте право ReadCustomerData или укажите customerCode вручную.') from None
+        raise Bad(f'Точка вернула HTTP {e.code} при поиске кода клиента.') from None
+    except (OSError,ValueError,KeyError,TypeError,StopIteration,AttributeError):
+        raise Bad('Не удалось получить код клиента от Точки.') from None
+    return list(dict.fromkeys(x['customerCode'] for x in rows if isinstance(x,dict)
+                              and x.get('customerType')=='Business'
+                              and re.fullmatch(r'[A-Za-z0-9]{1,9}',str(x.get('customerCode') or ''))))
 def qr_make(amt,purpose):
     t=tq()
-    if not t:raise Bad('Оплата по QR не подключена: впишите данные Точки в Настройках.')
-    if MOCK:return {'id':'mock'+nid(),'payload':'https://qr.nspk.ru/MOCK'+nid(),'img':None}
+    if not t:raise Bad('Заполните настройки интернет-эквайринга Точки.')
+    if MOCK:return {'id':'mock'+nid(),'payload':'https://example.com/test-payment/'+nid(),'img':None}
     seconds=(dt.datetime.combine(today()+dt.timedelta(days=1),dt.time(),MSK)-now()).total_seconds()
-    if seconds<60:raise Bad('День заканчивается. Получите новый QR после 00:00 по Москве.')
-    merchant,account=(urllib.parse.quote(t[k],safe='') for k in ('merchant','account'))
+    if seconds<60:raise Bad('День заканчивается. Создайте ссылку после 00:00 по Москве.')
+    data={'customerCode':t['customer'],'amount':format(Decimal(str(amt)),'.2f'),
+          'purpose':purpose[:140],'paymentMode':t['modes'],'preAuthorization':False,
+          'ttl':int(seconds//60),'paymentLinkId':'rent-'+nid()}
+    if t.get('retailer'):data['merchantId']=t['retailer']
     try:
-        r=tochka('POST',f"/sbp/v1.0/qr-code/merchant/{merchant}/{account}",{'Data':{'amount':int(round(amt*100)),'currency':'RUB',
-            'paymentPurpose':purpose[:140],'qrcType':'02','ttl':max(1,int(seconds//60)),
-            'imageParams':{'width':400,'height':400,'mediaType':'image/png'}}})['Data']
-        payload=chat_url(r['payload'])
-        if not payload or not isinstance(r['qrcId'],str) or not r['qrcId']:raise ValueError('QR response')
-        return {'id':r['qrcId'],'payload':payload,'img':(r.get('image') or {}).get('content')}
-    except Exception as e:print('tochka qr',e);raise Bad('Точка не ответила, попробуйте ещё раз.')
-def qr_paid(ids):
-    """Какие из QR оплачены (по ответу Точки)."""
-    if MOCK or not ids:return {}
-    r=tochka('GET','/sbp/v1.0/qr-codes/'+','.join(urllib.parse.quote(i,safe='') for i in ids)+'/payment-status')['Data']
-    return {x['qrcId']:txt(x.get('trxId'),80) for x in r.get('paymentList',[])
-            if x.get('status')=='Accepted' and x.get('qrcId') in ids}
+        operation=tochka('POST','/acquiring/v1.0/payments',{'Data':data})['Data']
+        payload=chat_url(operation['paymentLink'])
+        operation_id=operation['operationId']
+        if not payload or not isinstance(operation_id,str) or not operation_id:raise ValueError('payment response')
+        return {'id':operation_id,'payload':payload,'img':None}
+    except urllib.error.HTTPError as e:
+        print('tochka acquiring create HTTP',e.code)
+        if e.code==403:raise Bad('Точка запретила создание ссылки. Проверьте право MakeAcquiringOperation у JWT.') from None
+        raise Bad(f'Точка вернула HTTP {e.code} при создании ссылки.') from None
+    except (OSError,KeyError,TypeError,ValueError):
+        print('tochka acquiring create failed')
+        raise Bad('Не удалось создать платёжную ссылку Точки.') from None
+
+def acquiring_confirmation(q):
+    path='/acquiring/v1.0/payments/'+urllib.parse.quote(q['tid'],safe='')
+    operations=tochka('GET',path)['Data']['Operation']
+    for op in operations:
+        if op.get('operationId')!=q['tid']:continue
+        if op.get('status')=='EXPIRED':return {'expired':True}
+        if op.get('status')!='APPROVED':return None
+        if Decimal(str(op['amount']))!=Decimal(str(q['amt'])):
+            raise ValueError('confirmed payment amount differs')
+        mode=op.get('paymentType')
+        if mode not in ('card','sbp','digitalRuble'):
+            raise ValueError('unrecognized confirmed payment type')
+        stamp=dt.datetime.fromisoformat(op['paidAt']) if op.get('paidAt') else None
+        if stamp is not None and stamp.tzinfo is None:raise ValueError('payment time lacks timezone')
+        return {'transaction':txt(op.get('transactionId') or op.get('paymentId'),80),
+                'bank_mode':mode,'paid_ts':stamp.astimezone(MSK) if stamp else None}
+    return None
+
 def period_qr_current(r,q,on):
     if (paidn(r)!=q['base'] or not discount_matches(r,q)):return False
     try:current=term_quote(r,q['n'],q.get('term'),on)
@@ -964,7 +970,7 @@ def period_qr_current(r,q,on):
             and (not q.get('start') or q['start']==current['from'])
             and (not part or part==dstate(r,on)['dl']))
 def qr_available(r,q,on):
-    if q.get('status')!='open' or q['date']!=str(on) or not r or r.get('waiting'):return False
+    if q.get('provider')!='acquiring' or q.get('status')!='open' or q['date']!=str(on) or not r or r.get('waiting'):return False
     active=r['status']=='active'
     if q.get('bill'):
         b=doc(q['bill'])
@@ -998,14 +1004,14 @@ def new_qr(rid,r,n,by,debt=False,bill=None,term=None,expected=None,expected_quot
             return qid
     c=doc(r['client']) or {}
     m=qr_make(amt,('Аренда электровелосипеда'+(f", договор {r['contract']}" if r.get('contract') else '')+f", {c.get('name','')}").strip(', '))
-    d={'rent':rid,'n':n,'amt':amt,'pen':pe,'dpart':dp,'base':paidn(r),'date':str(on),'status':'open','tid':m['id'],'payload':m['payload'],'img':m['img'],'ts':now().isoformat(timespec='seconds')}
+    d={'provider':'acquiring','rent':rid,'n':n,'amt':amt,'pen':pe,'dpart':dp,'base':paidn(r),'date':str(on),'status':'open','tid':m['id'],'payload':m['payload'],'img':m['img'],'ts':now().isoformat(timespec='seconds')}
     if bill:
         d['bill']=bill[0]
         if bill[1]['kind']=='period':d['quote']=quote_stamp(term_quote(r,1,on=on))
     if term:d.update(term=term,start=q['from'])
     if n and not bill:d.update({key:q.get(key) for key in ('discount','discount_id')});d['quote']=quote_stamp(q)
     qid=nid();put(qid,'qr',d,'qr',by);return qid
-def on_paid(qid,q,transaction='',paid_date=None):
+def on_paid(qid,q,transaction='',paid_date=None,bank_mode=None,paid_ts=None):
     """Банк подтвердил оплату QR. Засчитываем автоматически, если это ещё имеет смысл; иначе — в «Не распознано»."""
     q=doc(qid)
     if not q or q.get('status') not in ('open','void'):return
@@ -1013,51 +1019,60 @@ def on_paid(qid,q,transaction='',paid_date=None):
     old=dict(q)
     r=doc(q['rent']);ok=False;o=json.loads(json.dumps(r)) if r else None;t=today()
     confirmed=now().isoformat(timespec='seconds')
-    same_day=q['date']==str(t)
-    if paid_date is not None:
+    payment_day=paid_ts.date() if paid_ts else t
+    same_day=q['date']==str(t)==str(payment_day)
+    if paid_ts is not None:
+        recorded=paid_ts.isoformat(timespec='seconds')
+    elif paid_date is not None:
         recorded=dt.datetime.combine(paid_date,dt.time(),MSK).isoformat(timespec='seconds')
     else:
         recorded=confirmed
-    needs_date=paid_date is None and not same_day
-    act_=r and r.get('status')=='active' and not r.get('waiting') and not cancelled and paid_date is None
+    needs_date=paid_ts is None and paid_date is None and not same_day
+    act_=r and r.get('status')=='active' and not r.get('waiting') and not cancelled and paid_date is None and same_day
     if act_ and q.get('bill'):
         b=doc(q['bill'])
         same_quote=not q.get('quote') or q['quote']==quote_stamp(term_quote(r,1))
         if b and b.get('status')=='open' and b['amt']==q['amt'] and bill_current(r,b) and same_quote and q['date']==str(t):
-            apply_money(r,b['kind'],q['amt'],'qr','СБП',qr=qid,on=t,ts=recorded)
+            apply_money(r,b['kind'],q['amt'],'qr','Точка',qr=qid,on=t,ts=recorded)
             r['pays'][-1]['bill']=q['bill']
             ob=dict(b);b['status']='paid';b['paid']=now().isoformat(timespec='seconds');put(q['bill'],'bill',b,'bill-paid','',ob);ok=True
     elif act_ and q['n'] and str(t)==q['date'] and period_qr_current(r,q,t):
         dp=q.get('dpart',0)
-        if dp:apply_money(r,'debt',dp,'qr','СБП',qr=qid,on=t,ts=recorded)
+        if dp:apply_money(r,'debt',dp,'qr','Точка',qr=qid,on=t,ts=recorded)
         terms=term_quote(r,q['n'],q.get('term'),on=t)
-        addpay(r,q['n'],cash(q['amt']-dp),q['pen'],'qr','СБП',qid,ts=recorded,term=q.get('term'),discount_info=terms,on=t)
+        addpay(r,q['n'],cash(q['amt']-dp),q['pen'],'qr','Точка',qid,ts=recorded,term=q.get('term'),discount_info=terms,on=t)
         ok=True
     elif act_ and not q.get('bill') and not q['n'] and q.get('dpart') and r.get('dl') and q['date']==str(t):
-        apply_money(r,'debt',cash(q['amt']),'qr','СБП',qr=qid,on=t,ts=recorded);ok=True
+        apply_money(r,'debt',cash(q['amt']),'qr','Точка',qr=qid,on=t,ts=recorded);ok=True
     elif r and not cancelled and same_day and paid_date is None and not q.get('bill') and not q.get('dpart') and not q['n'] and r.get('status')!='active' and cash(r.get('debt',0))==q['amt']:
-        pay_closed_debt(r,q['amt'],'qr','СБП',qid,ts=recorded);ok=True
+        pay_closed_debt(r,q['amt'],'qr','Точка',qid,ts=recorded);ok=True
+    def bank_fees(amount):
+        fees=sbp_fees(amount)
+        if bank_mode=='card':fees['acq']=percent(amount,cfg().get('card_acq',0))
+        return fees
     credited=0
     if ok:
         # Один банковский платёж может содержать аренду и доплату. Округляем удержания по всей операции.
         for payment in (r.get('pays') or [])[len(o.get('pays') or []):]:
-            previous=sbp_fees(credited)
+            if bank_mode:payment['bank_mode']=bank_mode
+            previous=bank_fees(credited)
             credited=cash(credited+payment['amt'])
-            payment['fees']={key:cash(fee-previous[key]) for key,fee in sbp_fees(credited).items()}
+            payment['fees']={key:cash(fee-previous[key]) for key,fee in bank_fees(credited).items()}
         if paidn(r)>paidn(o):
-            void_bills(q['rent'],'СБП',period_only=True);close_requests(q['rent'],'СБП')
+            void_bills(q['rent'],'Точка',period_only=True);close_requests(q['rent'],'Точка')
         put(q['rent'],'rent',r,'pay-qr','',o)
     uncredited=cash(q['amt']-credited)
     q.update(status='paid',result='applied' if ok and uncredited==0 else 'review',confirmed=confirmed)
     if not needs_date:q['paid_on']=recorded[:10]
     if transaction:q['transaction']=transaction
+    if bank_mode:q['bank_mode']=bank_mode
     put(qid,'qr',q,'qr-paid','',old)
     c=(doc((r or {}).get('client','')) or {}).get('name','')
     if ok and uncredited<=0:say(f"Оплата по QR: {c}, {rub(q['amt'])}.")
     else:
-        booked_fees=sbp_fees(credited)
-        fees={key:cash(fee-booked_fees[key]) for key,fee in sbp_fees(q['amt']).items()}
-        put(nid(),'unk',{'ts':recorded,'needs_date':needs_date,'amt':uncredited,'qr':qid,'rent':q['rent'],'status':'open','fees':fees,
+        booked_fees=bank_fees(credited)
+        fees={key:cash(fee-booked_fees[key]) for key,fee in bank_fees(q['amt']).items()}
+        put(nid(),'unk',{'ts':recorded,'needs_date':needs_date,'bank_mode':bank_mode,'amt':uncredited,'qr':qid,'rent':q['rent'],'status':'open','fees':fees,
             'why':'Переплата сверх долга' if ok else 'Оплата по отменённому QR' if cancelled else 'Оплата пришла после изменений в аренде или не в тот день'},'unk','')
         say(f"Платёж по QR не распознан: {c}, {rub(uncredited)}. Разберите в приложении.")
 def poll():
@@ -1066,33 +1081,25 @@ def poll():
         with L:
             if not tq():return
             cutoff=today()-dt.timedelta(days=QR_RECONCILE_DAYS)
-            pending={q['tid']:i for i,q in kind('qr') if q.get('status') in ('open','void') and not q.get('checked') and D(q['date'])>=cutoff}
-        ids=list(pending)
-        for start in range(0,len(ids),20):
-            batch=ids[start:start+20]
-            try:paid=qr_paid(batch)
-            except urllib.error.HTTPError as error:
-                if len(batch)==1 or error.code not in (400,404,414):
-                    print('poll',error);continue
-                paid={}
-                for tid in batch:
-                    try:paid.update(qr_paid([tid]))
-                    except Exception as error:print('poll',error)
-            except Exception as error:
-                print('poll',error);continue
-            with L:
-                for tid in paid:
-                    i=pending.get(tid)
-                    q=doc(i) if i else None
-                    if not q or q.get('tid')!=tid:continue
-                    try:
-                        with db:on_paid(i,q,transaction=paid[tid])
-                    except Exception as error:print('paid qr',i,error)
+            pending=[(i,q) for i,q in kind('qr') if q.get('provider')=='acquiring'
+                     and q['status'] in ('open','void') and not q.get('checked') and D(q['date'])>=cutoff]
+        for i,q in pending:
+            try:
+                result=acquiring_confirmation(q)
+                if not result:continue
+                with L,db:
+                    current=doc(i)
+                    if not current or current['tid']!=q['tid'] or current['status'] not in ('open','void'):continue
+                    if result.get('expired'):
+                        put(i,'qr',{**current,'status':'void','checked':str(today())},'payment-expired','',current)
+                    else:on_paid(i,current,**result)
+            except (urllib.error.HTTPError, OSError, KeyError, TypeError, ValueError, InvalidOperation) as error:
+                print('tochka acquiring status',getattr(error,'code',type(error).__name__))
     finally:POLL.release()
 # ---------- права и представление ----------
 def qr_needs_statement(q,on):
     cutoff=on-dt.timedelta(days=QR_RECONCILE_DAYS)
-    return q['status'] in ('open','void') and not q.get('checked') and D(q['date'])<cutoff
+    return q['status'] in ('open','void') and not q.get('checked') and (q.get('provider')!='acquiring' or D(q['date'])<cutoff)
 
 def statement_date(value,q,on):
     date=day(value)
@@ -1154,7 +1161,7 @@ def snapshot(ro,P):
     if ro=='owner':c['bot_info']=bot_info_data(c)
     else:c.pop('bot_info',None)
     c.update(contact_data(c))
-    c['tochka']={'on':bool(tq()),'merchant':tc.get('merchant',''),'account':tc.get('account',''),'jwt':bool(tc.get('jwt')),'hook':tc.get('hook','')} if ro=='owner' else {'on':bool(tq())}
+    c['tochka']={'on':bool(tq()),'retailer':tc.get('retailer',''),'customer':tc.get('customer',''),'modes':tc.get('modes',['card','sbp']),'jwt':bool(tc.get('jwt')),'hook':tc.get('hook','')} if ro=='owner' else {'on':bool(tq())}
     if ro!='owner':c.pop('pen_rates',None)
     c['pen_active']=charge_rate_on(t)
     if not fin:c={x:c[x] for x in('week','month','renewal_rates','pen','pen_active','grace','cdef','archdays','cats','tochka')}
@@ -1181,7 +1188,7 @@ def mine(cid):
                for j,x in kind('bill') if x.get('rent')==i and x.get('status')=='open' and not d.get('waiting') and bill_current(d,x,t)]
         r={'id':i,'issued':d.get('issued'),'type':d['type'],'st':st,'q1':q1['amt'],'bills':bills,
            'waiting':d.get('waiting'),'terms':list(d.get('rates') or {}),'return_request':d.get('return_request'),
-           'pays':[{k:p.get(k) for k in('ts','n','amt','pen','method','kind','term','discount')} for p in d.get('pays') or []][-30:],'qr':None if d.get('waiting') else qr}
+           'pays':[{k:p.get(k) for k in('ts','n','amt','pen','method','kind','term','discount','bank_mode')} for p in d.get('pays') or []][-30:],'qr':None if d.get('waiting') else qr}
     closed=[d for _,d in kind('rent') if d.get('client')==cid and d.get('status')!='active']
     debt=cash(sum(d.get('debt',0) for d in closed))
     refund_due=cash(sum(refund_balance(d) for d in closed))
@@ -1661,6 +1668,7 @@ def act(a,b,ro,P,by):
                 pay_closed_debt(r,u['amt'],'qr',by,qr=u.get('qr'),ts=u['ts'])
             payment=r['pays'][-1]
             if u.get('fees'):payment['fees']=u['fees']
+            if u.get('bank_mode'):payment['bank_mode']=u['bank_mode']
             if q and bill and (bill['kind']=='debt' or not to_debt) and cash(u['amt'])==bill['amt']:
                 put(q['bill'],'bill',{**bill,'status':'paid','paid':u['ts']},'bill-paid',by,bill)
                 payment['bill']=q['bill']
@@ -1683,7 +1691,7 @@ def act(a,b,ro,P,by):
             rates=c.get('pen_rates') or [{'from':'0001-01-01','rate':c['pen']}]
             c['pen_rates']=[x for x in rates if x['from']<effective]+[{'from':effective,'rate':rate}]
             c['pen']=rate
-        for k in ('tax','acq','receipt',*OFFLINE_FEES):c[k]=num(b.get(k,c[k]),0,100)
+        for k in ('tax','acq','receipt','card_acq',*OFFLINE_FEES):c[k]=num(b.get(k,c.get(k,0)),0,100)
         for key,high in (('cdef',3),('grace',10)):
             if key in b:integer(b[key],0,high)
         c['archdays']=integer(b.get('archdays',c['archdays']),0,365)
@@ -1699,7 +1707,14 @@ def act(a,b,ro,P,by):
         if isinstance(b.get('cats'),list):c['cats']=[txt(x,40) for x in b['cats'] if txt(x,40)][:30] or DEF['cats']
         if isinstance(b.get('tochka'),dict):
             tc=dict(c.get('tochka') or {});x=b['tochka']
-            tc['merchant']=txt(x.get('merchant'),60);tc['account']=txt(x.get('account'),80)
+            if 'customer' in x:
+                customer=txt(x['customer'],20);retailer=txt(x.get('retailer'),30)
+                if customer and not re.fullmatch(r'[A-Za-z0-9]{1,9}',customer):raise Bad('Проверьте customerCode из Точка.API.')
+                if retailer and not re.fullmatch(r'[0-9]{15}',retailer):raise Bad('merchantId интернет-эквайринга должен содержать 15 цифр.')
+                modes=x.get('modes')
+                if not isinstance(modes,list) or not modes or any(v not in ('card','sbp') for v in modes):
+                    raise Bad('Выберите карту или СБП для оплаты.')
+                tc.update(customer=customer,retailer=retailer,modes=list(dict.fromkeys(modes)))
             if x.get('jwt'):tc['jwt']=str(x['jwt']).strip()[:5000]
             if x.get('clear'):tc={}
             tc.setdefault('hook',secrets.token_urlsafe(18)) if tc else None
@@ -1858,7 +1873,7 @@ def validate_backup(items):
         for key in ('date','bought','gone','issued','start','closed','waiting','waive','arch','created','purged','return_plan','contract_limit'):
             if d.get(key):date(d[key])
         if k=='cfg':
-            for key in ('pen','tax','acq','receipt','week','month',*OFFLINE_FEES):
+            for key in ('pen','tax','acq','receipt','card_acq','week','month',*OFFLINE_FEES):
                 if key in d:
                     amount(d[key])
                     num(d[key],0,10**8 if key in ('week','month') else 100)
@@ -2096,11 +2111,11 @@ class H(BaseHTTPRequestHandler):
         except Exception:return s.send(400,{})
         if not isinstance(b,dict):return s.send(400,{})
         t=time.time()
-        if p=='/api/tochka/accounts':
+        if p=='/api/tochka/customers':
             if u!=OWNER:return s.send(403,{})
-            try:accounts=tochka_accounts()
+            try:customers=tochka_customers()
             except Bad as e:return s.send(400,{'err':str(e)})
-            return s.send(200,{'accounts':accounts},x={'Cache-Control':'no-store'})
+            return s.send(200,{'customers':customers},x={'Cache-Control':'no-store'})
         if p=='/api/qrimg':
             # картинка QR, нарисованная в приложении: храним 10 минут, чтобы Telegram мог её скачать
             import base64
