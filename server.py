@@ -895,7 +895,7 @@ def tochka(method,path,body=None):
     return tochka_request(t['jwt'],method,path,body)
 def tochka_request(jwt,method,path,body=None):
     rq=urllib.request.Request(TQB+path,json.dumps(body).encode() if body is not None else None,
-        {'Authorization':'Bearer '+jwt,'Content-Type':'application/json'},method=method)
+        {'Authorization':'Bearer '+jwt,'Accept':'application/json','Content-Type':'application/json'},method=method)
     return json.load(urllib.request.urlopen(rq,timeout=25))
 def tochka_accounts():
     with L:
@@ -903,14 +903,24 @@ def tochka_accounts():
     if not jwt:raise Bad('Сначала сохраните JWT в настройках.')
     try:
         data=tochka_request(jwt,'GET','/open-banking/v1.0/accounts')['Data']
-        rows=data['Account']
-        if not isinstance(rows,list):raise ValueError('accounts')
     except urllib.error.HTTPError as e:
-        if e.code==401:raise Bad('Точка не приняла JWT. Проверьте срок действия токена.') from None
-        if e.code==403:raise Bad('Точка запретила чтение счетов. Проверьте доступ JWT к списку счетов.') from None
-        raise Bad('Точка вернула ошибку при получении списка счетов.') from None
-    except (OSError,ValueError,KeyError,TypeError):
-        raise Bad('Не удалось получить список счетов от Точки. Попробуйте ещё раз.') from None
+        if e.code==401:raise Bad('Точка вернула HTTP 401. Проверьте срок действия JWT.') from None
+        if e.code==403:raise Bad('Точка вернула HTTP 403. Проверьте в интернет-банке доступ JWT к чтению счетов.') from None
+        raise Bad(f'Точка вернула HTTP {e.code} при запросе списка счетов.') from None
+    except (TimeoutError,urllib.error.URLError):
+        raise Bad('Сервер аренды не смог соединиться с API Точки или дождаться ответа.') from None
+    except OSError:
+        raise Bad('Соединение с API Точки прервалось.') from None
+    except (ValueError,KeyError,TypeError):
+        raise Bad('Точка ответила, но в ответе нет данных списка счетов.') from None
+    if isinstance(data,dict):
+        # В списке и в старом формате шлюза ключ коллекции отличается регистром и числом.
+        rows=next((value for key,value in data.items()
+                   if key.lower() in ('account','accounts') and isinstance(value,list)),None)
+    else:
+        rows=data
+    if not isinstance(rows,list):
+        raise Bad('Точка ответила, но приложение не распознало формат списка счетов.')
     return list(dict.fromkeys(row['accountId'] for row in rows if isinstance(row,dict)
                               and isinstance(row.get('accountId'),str) and 0<len(row['accountId'])<=40))
 def qr_make(amt,purpose):
