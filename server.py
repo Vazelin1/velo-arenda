@@ -1,3 +1,4 @@
+import ssl
 """Аренда электровелосипедов: сервер Telegram mini app.
 Вся бизнес-логика (периоды, неустойка, отсрочки, оплаты, возвраты) считается здесь, интерфейс только показывает и вызывает действия."""
 import os,re,json,hmac,hashlib,sqlite3,threading,time,secrets,urllib.request,urllib.error,urllib.parse,datetime as dt
@@ -896,7 +897,12 @@ def tochka(method,path,body=None):
 def tochka_request(jwt,method,path,body=None):
     rq=urllib.request.Request(TQB+path,json.dumps(body).encode() if body is not None else None,
         {'Authorization':'Bearer '+jwt,'Accept':'application/json','Content-Type':'application/json'},method=method)
-    return json.load(urllib.request.urlopen(rq,timeout=25))
+    context=ssl.create_default_context()
+    bank_ca=Path('/app/tochka-ca.pem')
+    if urllib.parse.urlsplit(rq.full_url).hostname=='enter.tochka.com' and bank_ca.is_file():
+        context.load_verify_locations(cafile=str(bank_ca))
+    with urllib.request.urlopen(rq,timeout=25,context=context) as response:
+        return json.load(response)
 def tochka_accounts():
     with L:
         jwt=(cfg().get('tochka') or {}).get('jwt')
@@ -907,8 +913,12 @@ def tochka_accounts():
         if e.code==401:raise Bad('Точка вернула HTTP 401. Проверьте срок действия JWT.') from None
         if e.code==403:raise Bad('Точка вернула HTTP 403. Проверьте в интернет-банке доступ JWT к чтению счетов.') from None
         raise Bad(f'Точка вернула HTTP {e.code} при запросе списка счетов.') from None
-    except (TimeoutError,urllib.error.URLError):
+    except urllib.error.URLError as e:
+        if isinstance(e.reason,ssl.SSLCertVerificationError):
+            raise Bad('Сервер аренды не доверяет сертификату Точки. Проверьте сертификаты в контейнере.') from None
         raise Bad('Сервер аренды не смог соединиться с API Точки или дождаться ответа.') from None
+    except TimeoutError:
+        raise Bad('API Точки не ответил вовремя.') from None
     except OSError:
         raise Bad('Соединение с API Точки прервалось.') from None
     except (ValueError,KeyError,TypeError):
