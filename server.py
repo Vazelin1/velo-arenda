@@ -892,9 +892,27 @@ def tq():
 def tochka(method,path,body=None):
     with L:t=tq()
     if not t:raise Bad('Оплата по QR не подключена')
+    return tochka_request(t['jwt'],method,path,body)
+def tochka_request(jwt,method,path,body=None):
     rq=urllib.request.Request(TQB+path,json.dumps(body).encode() if body is not None else None,
-        {'Authorization':'Bearer '+t['jwt'],'Content-Type':'application/json'},method=method)
+        {'Authorization':'Bearer '+jwt,'Content-Type':'application/json'},method=method)
     return json.load(urllib.request.urlopen(rq,timeout=25))
+def tochka_accounts():
+    with L:
+        jwt=(cfg().get('tochka') or {}).get('jwt')
+    if not jwt:raise Bad('Сначала сохраните JWT в настройках.')
+    try:
+        data=tochka_request(jwt,'GET','/open-banking/v1.0/accounts')['Data']
+        rows=data['Account']
+        if not isinstance(rows,list):raise ValueError('accounts')
+    except urllib.error.HTTPError as e:
+        if e.code==401:raise Bad('Точка не приняла JWT. Проверьте срок действия токена.') from None
+        if e.code==403:raise Bad('Точка запретила чтение счетов. Проверьте доступ JWT к списку счетов.') from None
+        raise Bad('Точка вернула ошибку при получении списка счетов.') from None
+    except (OSError,ValueError,KeyError,TypeError):
+        raise Bad('Не удалось получить список счетов от Точки. Попробуйте ещё раз.') from None
+    return list(dict.fromkeys(row['accountId'] for row in rows if isinstance(row,dict)
+                              and isinstance(row.get('accountId'),str) and 0<len(row['accountId'])<=40))
 def qr_make(amt,purpose):
     t=tq()
     if not t:raise Bad('Оплата по QR не подключена: впишите данные Точки в Настройках.')
@@ -2058,6 +2076,11 @@ class H(BaseHTTPRequestHandler):
         except Exception:return s.send(400,{})
         if not isinstance(b,dict):return s.send(400,{})
         t=time.time()
+        if p=='/api/tochka/accounts':
+            if u!=OWNER:return s.send(403,{})
+            try:accounts=tochka_accounts()
+            except Bad as e:return s.send(400,{'err':str(e)})
+            return s.send(200,{'accounts':accounts},x={'Cache-Control':'no-store'})
         if p=='/api/qrimg':
             # картинка QR, нарисованная в приложении: храним 10 минут, чтобы Telegram мог её скачать
             import base64
