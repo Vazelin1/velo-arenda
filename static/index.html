@@ -1716,9 +1716,34 @@ async function clientPayment(run){
     try{await run()}catch(error){uiAlert(error)}
     finally{clientPaymentBusy=false}
 }
-async function cAfter(qid,title){
+const isIOS=()=>T.platform==='ios'||/iPhone|iPad|iPod/.test(navigator.userAgent)||
+    (navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+async function copySafariPayment(url){
+    try{
+        await navigator.clipboard.writeText(url);
+        toast('Ссылка скопирована. Вставьте её в Safari.');
+    }catch{
+        await sheet(`<h3>Оплата в Safari</h3><p>Скопируйте ссылку ниже и вставьте её в адресную строку Safari.</p>
+        <label class=fld><span>Ссылка на оплату</span><input type=text data-url readonly value="${esc(url)}"></label>
+        <button class="btn blk" data-copy>Скопировать ссылку</button>
+        <button class="btn sec blk" data-close>Закрыть</button>`,(o,close)=>{
+            const input=o.querySelector('[data-url]');
+            input.onclick=()=>input.select();
+            o.querySelector('[data-copy]').onclick=async()=>{
+                try{
+                    await navigator.clipboard.writeText(url);
+                    close();
+                    toast('Ссылка скопирована. Вставьте её в Safari.');
+                }catch{input.focus();input.select()}
+            };
+            o.querySelector('[data-close]').onclick=()=>close();
+        });
+    }
+}
+async function cAfter(qid,title,copyForSafari=false){
     const q=await api('/api/qr/'+qid);
     if(q.status=='open'){
+        if(copyForSafari)return copySafariPayment(q.payload);
         if(typeof T.openLink==='function'&&!String(T.platform||'').startsWith('web')){
             try{T.openLink(q.payload);return}catch{}
         }else{
@@ -1730,38 +1755,65 @@ async function cAfter(qid,title){
     ME=await api('/api/me');
     cui();
 }
-function cBill(bid){return clientPayment(async()=>{
-    const r=await api('/api/c',{a:'qr',bill:bid});
-    await cAfter(r.qr,'Выставленный платёж');
-})}
-function cDebt(){return clientPayment(async()=>{
-    const r=await api('/api/c',{a:'qr',debtonly:1});
-    await cAfter(r.qr,'Доплата долга');
-})}
+const receiptEmailField=()=>`<label class=fld><span>Почта для чека</span><input type=email data-receipt-email autocomplete=email maxlength=254 required value="${esc(ME.receipt_email||'')}" placeholder="name@example.ru"></label>`;
+const readReceiptEmail=input=>{
+    input.value=input.value.trim();
+    return input.reportValidity()?input.value:null;
+};
+async function cPayAmount(params,title){
+    const email=ME.receipt_email||await sheet(`<h3>${esc(title)}</h3>${receiptEmailField()}
+        <button class="btn blk" data-pay>Оплатить</button><button class="btn sec blk" data-cancel>Отмена</button>`,(o,close)=>{
+        o.querySelector('[data-pay]').onclick=()=>{
+            const value=readReceiptEmail(o.querySelector('[data-receipt-email]'));
+            if(value)close(value);
+        };
+        o.querySelector('[data-cancel]').onclick=()=>close(null);
+    },null);
+    if(!email)return;
+    const r=await api('/api/c',{a:'qr',...params,receipt_email:email});
+    ME.receipt_email=email;
+    await cAfter(r.qr,title);
+}
+function cBill(bid){return clientPayment(()=>cPayAmount({bill:bid},'Выставленный платёж'))}
+function cDebt(){return clientPayment(()=>cPayAmount({debtonly:1},'Доплата долга'))}
 async function qrPeriodS(s,terms,call,onQr,onlyDebt){
 const client=ME.role=='client',caption=client?'Оплатить':'Создать ссылку на оплату';
-let payment,closed=false;
-await sheet(`<h3>Оплата аренды</h3><p>Сумма рассчитана на сегодня.</p><div class=fld><span>Период оплаты</span>${paymentOptions(s,terms)}</div>
+const safari=client&&ME.qr&&isIOS();
+let payment,closed=false,copyForSafari=false;
+await sheet(`<h3>Оплата аренды</h3><p>Сумма рассчитана на сегодня.</p>
+${safari?'<p class=sm>Если банк не открывается на iPhone или iPad, скопируйте ссылку на оплату и вставьте её в Safari.</p>':''}<div class=fld><span>Период оплаты</span>${paymentOptions(s,terms)}</div>
 ${s.dl>0?`<label class=sw style="padding:14px 0 0"><span class=tx><b>Вместе с долгом ${onlyDebt?'':QB('withdebt')}</b><span>Долг ${money2(s.dl)}</span></span><input type=checkbox id=wd checked></label>`:''}
-<div class=pv><div class=sm>К оплате</div><div class=big id=qa>…</div><div class=sm id=qd></div></div><button class="btn blk lg" data-y disabled>${caption}</button>
+<div class=pv><div class=sm>К оплате</div><div class=big id=qa>…</div><div class=sm id=qd></div></div>
+${client&&ME.qr?receiptEmailField():''}<button class="btn blk lg" data-y disabled>${caption}</button>
+${safari?'<button class="btn sec blk" data-safari disabled>Скопировать ссылку для Safari</button>':''}
 ${s.dl>0&&onlyDebt?'<button class="btn sec blk" data-d>Оплатить только долг</button>':''}<button class="btn sec blk" data-n>Отмена</button>`,(o,d)=>{
-const y=o.querySelector('[data-y]'),w=o.querySelector('#wd');
+const y=o.querySelector('[data-y]'),w=o.querySelector('#wd'),copy=o.querySelector('[data-safari]');
 const params=()=>({...selectedPeriod(o),debt:!!w?.checked});
 let seq=0,shown,busy=false;
-const upd=async()=>{const req=++seq;y.disabled=true;
+const upd=async()=>{const req=++seq;y.disabled=true;if(copy)copy.disabled=true;
 try{const q=await call('quote',params());if(req!=seq)return;
-shown=q;o.querySelector('#qa').textContent=money2(q.amt);o.querySelector('#qd').textContent=quoteDetails(q);y.textContent=q.amt==0?'Применить скидку':caption;y.disabled=busy||(ME.role=='client'&&!ME.qr&&q.amt>0)}
+shown=q;o.querySelector('#qa').textContent=money2(q.amt);o.querySelector('#qd').textContent=quoteDetails(q);y.textContent=q.amt==0?'Применить скидку':caption;y.disabled=busy||(client&&!ME.qr&&q.amt>0);if(copy)copy.disabled=y.disabled||q.amt<=0}
 catch(e){if(req==seq){o.querySelector('#qa').textContent='—';o.querySelector('#qd').textContent=e}}};
 wireSeg(o,upd);upd();if(w)w.onchange=upd;o.querySelector('[data-n]').onclick=()=>d();
 const debtBtn=o.querySelector('[data-d]');if(debtBtn)debtBtn.onclick=()=>{d();onlyDebt()};
-y.onclick=async()=>{if(busy||y.disabled)return;busy=true;y.disabled=true;y.textContent='Подготавливаем оплату…';
-try{const r=await call('qr',{...params(),expected:shown.amt,expected_quote:shown.stamp});
+const submit=async forSafari=>{
+if(busy||y.disabled||(forSafari&&copy.disabled))return;
+const input=o.querySelector('[data-receipt-email]');
+const email=input&&shown.amt>0?readReceiptEmail(input):undefined;
+if(email===null)return;
+busy=true;y.disabled=true;if(copy)copy.disabled=true;
+(forSafari?copy:y).textContent=forSafari?'Готовим ссылку…':'Подготавливаем оплату…';
+try{const r=await call('qr',{...params(),expected:shown.amt,expected_quote:shown.stamp,receipt_email:email});
+if(email)ME.receipt_email=email;
 if(closed)return;
-payment=r;d()}
-catch(e){if(!closed){uiAlert(e);busy=false;upd()}}}});
+payment=r;copyForSafari=forSafari;d()}
+catch(e){if(!closed){uiAlert(e);busy=false;if(copy)copy.textContent='Скопировать ссылку для Safari';upd()}}};
+y.onclick=()=>submit(false);
+if(copy)copy.onclick=()=>submit(true);
+});
 closed=true;
 try{
-    if(payment?.qr)await onQr(payment.qr);
+    if(payment?.qr)await onQr(payment.qr,copyForSafari);
     else if(payment){
         toast('Скидка применена, срок оплачен');
         if(client){ME=await api('/api/me');cui()}else await reload()
@@ -1770,7 +1822,7 @@ try{
 }
 function cPay(){return clientPayment(async()=>{
     const R=ME.rent;
-    await qrPeriodS(R.st,R.terms,(a,b)=>api('/api/c',{a,...b}),q=>cAfter(q,'Оплата аренды'));
+    await qrPeriodS(R.st,R.terms,(a,b)=>api('/api/c',{a,...b}),(q,copy)=>cAfter(q,'Оплата аренды',copy));
 })}
 async function cReturn(){const rq=ME.rent?.return_request,t=TODAY();
 await sheet(`<h3>Возврат велосипеда</h3><p>Укажите планируемую дату. Для согласования времени свяжитесь с нами. Аренда продолжается до фактического возврата велосипеда.</p><label class=fld><span>Дата возврата</span><input id=rd type=date min="${t}" max="${addD(t,365)}" value="${rq?.date||t}"></label><label class=fld><span>Комментарий</span><textarea id=rn maxlength=200 placeholder="Например: смогу приехать вечером">${esc(rq?.note||'')}</textarea></label><button class="btn blk lg" data-y>Отправить заявку</button>${rq?'<button class="btn dng blk" data-cancel>Отменить заявку на возврат</button>':''}<button class="btn sec blk" data-n>Закрыть</button>`,(o,d)=>{o.querySelector('[data-n]').onclick=()=>d();const submit=async cancel=>{const y=o.querySelector('[data-y]');y.disabled=true;try{await api('/api/c',cancel?{a:'return_cancel'}:{a:'return_request',date:o.querySelector('#rd').value,note:o.querySelector('#rn').value});d();ME=await api('/api/me');cui();toast(cancel?'Заявка отменена':'Заявка отправлена')}catch(e){uiAlert(e)}finally{y.disabled=false}};o.querySelector('[data-y]').onclick=()=>submit(false);const cancel=o.querySelector('[data-cancel]');if(cancel)cancel.onclick=()=>submit(true)})}
