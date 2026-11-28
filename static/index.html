@@ -531,10 +531,9 @@ async function showQR(qid,title,client){
     try{q=await api('/api/qr/'+qid)}catch(e){return uiAlert(e)}
     if(q.status!='open')return uiAlert(q.result=='review'?'Деньги поступили. Платёж проверяется.':q.status=='paid'?'Оплата уже получена':'Ссылка больше не действует.');
     let timer;
-    await sheet(`<h3>Оплата через Точку</h3><p>${esc(title||'')}</p>
+    await sheet(`<h3>${esc(client?title:'Платёжная ссылка')}</h3>${client?'':`<p>${esc(title||'')}</p>`}
     <div class=pv><div class=big>${money2(q.amt)}</div></div>
-    <p>На странице Точки выберите доступный способ оплаты.</p>
-    <a class="btn blk lg" href="${esc(q.payload)}" target="_blank" rel="noopener noreferrer" onclick="openContact(event,this)">Открыть страницу оплаты</a>
+    <a class="btn blk lg" href="${esc(q.payload)}" ${client?'':'target="_blank" rel="noopener noreferrer"'}>${client?'Оплатить':'Перейти к оплате'}</a>
     <div class=sm role=status data-pay-status>Ждём подтверждение банка…</div>
     ${client?'':`<button class="btn sec blk" data-copy>Скопировать ссылку</button>`}
     <button class="btn sec blk" data-close>Закрыть</button>`,(o,close)=>{
@@ -1650,8 +1649,8 @@ days:()=>['Оплаченные дни','Столько дней аренды у
 next:()=>['Когда платить',`Оплатите аренду в указанный день. Следующие два календарных дня проходят без неустойки. При полной неоплате начисление начинается с третьего дня просрочки. ${PARTIAL_RULE} Даты следующих оплат остаются по графику. Неделя — 7 дней, месяц — 30 дней.`],
 late:()=>{const p=ME.pen,base=ME.rent?.st?.nprice??3700;return ['Просрочка и неустойка',`Если срок оплаты был 20-го числа, 21-го и 22-го неустойки нет. При полной неоплате с 23-го начисляется ${p}% от платежа за каждый день. За четыре дня просрочки по платежу ${money2(base)} начислится ${money2(base*p/100*2)}. Если вы внесли часть суммы 22-го, остаток можно доплатить до 24-го включительно. С 25-го неустойка начисляется на остаток. При частичной оплате после начала начисления уже начисленная сумма сохраняется.`]},
 debt:()=>{const s=ME.rent?.st;return ['Долг',`${s?.ddue?'Ближайшая дата доплаты — '+fmt(s.ddue)+' включительно. ':''}${PARTIAL_RULE} При доплате частями срок остаётся тем же. Сначала погашается начисленная неустойка, затем основной долг.`]},
-bill:()=>['Выставленный платёж',`Оплатите указанную сумму на странице Точки. При оплате части суммы остаток появится в карточке долга вместе с датой доплаты. ${PARTIAL_RULE}`],
-qr:()=>['Оплата через Точку','Выберите срок, откройте платёжную страницу и выберите доступный способ оплаты.'],
+bill:()=>['Выставленный платёж',`Нажмите «Оплатить», чтобы внести указанную сумму. При оплате части суммы остаток появится в карточке долга вместе с датой доплаты. ${PARTIAL_RULE}`],
+qr:()=>['Оплата аренды','Выберите период и нажмите «Оплатить». Для оплаты по СБП выберите свой банк.'],
 withdebt:()=>['Вместе с долгом','Одним платежом оплатите и аренду, и долг.'],
 returnbike:()=>['Планирую вернуть велосипед','Укажите дату, когда планируете привезти велосипед, и при необходимости оставьте комментарий. Мы увидим заявку; для согласования времени свяжитесь с нами. Сама заявка не останавливает аренду и начисления. Их останавливает арендодатель, переводя аренду в ожидание возврата или завершая её. Если планы изменились, заявку можно изменить или отменить.'],
 };
@@ -1692,7 +1691,7 @@ if(R.waiting){$('#app').innerHTML=h+`<div class="cn"><div class=mid>Ждём в�
 const s=R.st,pen=ME.pen,last=s.late==0&&s.left==0,dlate=s.dlate||0,L=Math.max(s.late,dlate);
 const top=L>0?[(s.pen||s.dpen||s.dl)?'t-er':'t-wa','alert',s.late>0?`Просрочка ${s.late} ${dayWord(s.late)}`:`Долг просрочен на ${dlate} ${dayWord(dlate)}`]:s.dl>0?['t-er','alert',`Долг ${m(s.dl)} — доплатите до ${dshort(s.ddue)}`]:last?['t-wa','clock',s.firstterm?'Сегодня нужно оплатить первый срок':'Сегодня последний оплаченный день']:['t-ok','check',`Оплачено ещё ${s.pdays} ${dayWord(s.pdays)}`];
 if(!(s.dl>0&&L==0))h+=`<div class="cb ${top[0]}"><span class=gl>${ic(top[1])}</span><span style="flex:1">${top[2]}</span>${QB(L>0?(s.late>0?'late':'debt'):s.dl>0?'debt':last?'next':'days')}</div>`;
-for(const b of R.bills||[])h+=`<div class="cn" style="border:2px solid var(--pine)"><div class=mu>Вам выставлен платёж ${b.kind=='debt'?'в счёт долга':'за аренду'}${QB('bill')}</div><div class=big style="margin-top:4px">${m(b.amt)}</div>${b.partial_due?`<div class=mu>Если оплатить сегодня, остаток нужно внести до ${dshort(b.partial_due)} включительно.</div>`:''}${ME.qr?`<button class="btn blk" style="margin-top:12px" onclick="cBill('${b.id}')">${ic('receipt','s')}Открыть оплату</button>`:`<div class=mu>Оплатите, как договорились.</div>`}</div>`;
+for(const b of R.bills||[])h+=`<div class="cn" style="border:2px solid var(--pine)"><div class=mu>Вам выставлен платёж ${b.kind=='debt'?'в счёт долга':'за аренду'}${QB('bill')}</div><div class=big style="margin-top:4px">${m(b.amt)}</div>${b.partial_due?`<div class=mu>Если оплатить сегодня, остаток нужно внести до ${dshort(b.partial_due)} включительно.</div>`:''}${ME.qr?`<button class="btn blk" style="margin-top:12px" onclick="cBill('${b.id}')">${ic('receipt','s')}Оплатить</button>`:`<div class=mu>Оплатите, как договорились.</div>`}</div>`;
 if(s.dl>0)h+=`<div class="cn dcard"><div class=mu>${dlate>0?`Долг — срок доплаты был ${dshort(s.ddue)}`:`Долг — доплатить до ${dshort(s.ddue)} включительно`}${QB('debt')}</div><div class=big style="margin-top:4px;color:var(--ert)">${m(s.dl)}</div>
 <div class=mu>${s.dpen?`В том числе неустойка ${money2(s.dpen)}`:s.dpfrom>=ME.today&&!s.nopen&&!s.defer&&pen>0?`<b>Неустойка на остаток с ${dshort(s.dpfrom)}</b> — ${pen}% в день`:'Остаток после частичной оплаты'}</div>
 ${ME.qr?`<div class=mu style="margin-top:6px;color:var(--ert);font-weight:650">Сначала оплатите долг</div><button class="btn dng blk" style="margin-top:12px" onclick="cDebt()">${ic('receipt','s')}Оплатить остаток</button>`:''}</div>`;
@@ -1710,30 +1709,69 @@ h+=`<div class=cp>${ME.qr||ME.discount?`<button class=tl onclick="cPay()"><span 
 ${R.return_request?`<div class="cn t-bl"><b>Возврат ${fmt(R.return_request.date)}</b>${QB('returnbike')}<div class=sm>${R.return_request.ack?'Заявка просмотрена':'Заявка отправлена'}. Аренда продолжается до фактического возврата.</div>${R.return_request.note?`<div class=sm>${tx2(R.return_request.note)}</div>`:''}<button class="btn sec blk" style="margin-top:10px" onclick="cReturn()">Изменить или отменить заявку</button></div>`:`<div class=cp><button class=tl onclick="cReturn()"><span class=gl>${ic('flag')}</span><span style="flex:1">Планирую вернуть велосипед</span>${QB('returnbike')}${ic('right','s')}</button></div>`}
 ${ME.debt?`<div class="note t-er">${ic('alert','s')}<div>Долг по прошлой аренде: <b>${m(ME.debt)}</b></div></div>`:''}`;
 $('#app').innerHTML=h+footer}
-async function cAfter(qid,title){await showQR(qid,title,1);ME=await api('/api/me');cui()}
-async function cBill(bid){try{const r=await api('/api/c',{a:'qr',bill:bid});await cAfter(r.qr,'Выставленный платёж')}catch(e){uiAlert(e)}}
-async function cDebt(){try{const r=await api('/api/c',{a:'qr',debtonly:1});await cAfter(r.qr,'Доплата долга')}catch(e){uiAlert(e)}}
+let clientPaymentBusy=false;
+async function clientPayment(run){
+    if(clientPaymentBusy)return;
+    clientPaymentBusy=true;
+    try{await run()}catch(error){uiAlert(error)}
+    finally{clientPaymentBusy=false}
+}
+async function cAfter(qid,title){
+    const q=await api('/api/qr/'+qid);
+    if(q.status=='open'){
+        if(typeof T.openLink==='function'&&!String(T.platform||'').startsWith('web')){
+            try{T.openLink(q.payload);return}catch{}
+        }else{
+            location.assign(q.payload);
+            return;
+        }
+    }
+    await showQR(qid,title,true);
+    ME=await api('/api/me');
+    cui();
+}
+function cBill(bid){return clientPayment(async()=>{
+    const r=await api('/api/c',{a:'qr',bill:bid});
+    await cAfter(r.qr,'Выставленный платёж');
+})}
+function cDebt(){return clientPayment(async()=>{
+    const r=await api('/api/c',{a:'qr',debtonly:1});
+    await cAfter(r.qr,'Доплата долга');
+})}
 async function qrPeriodS(s,terms,call,onQr,onlyDebt){
+const client=ME.role=='client',caption=client?'Оплатить':'Создать ссылку на оплату';
+let payment,closed=false;
 await sheet(`<h3>Оплата аренды</h3><p>Сумма рассчитана на сегодня.</p><div class=fld><span>Период оплаты</span>${paymentOptions(s,terms)}</div>
 ${s.dl>0?`<label class=sw style="padding:14px 0 0"><span class=tx><b>Вместе с долгом ${onlyDebt?'':QB('withdebt')}</b><span>Долг ${money2(s.dl)}</span></span><input type=checkbox id=wd checked></label>`:''}
-<div class=pv><div class=sm>К оплате</div><div class=big id=qa>…</div><div class=sm id=qd></div></div><button class="btn blk lg" data-y disabled>Создать ссылку на оплату</button>
+<div class=pv><div class=sm>К оплате</div><div class=big id=qa>…</div><div class=sm id=qd></div></div><button class="btn blk lg" data-y disabled>${caption}</button>
 ${s.dl>0&&onlyDebt?'<button class="btn sec blk" data-d>Оплатить только долг</button>':''}<button class="btn sec blk" data-n>Отмена</button>`,(o,d)=>{
 const y=o.querySelector('[data-y]'),w=o.querySelector('#wd');
 const params=()=>({...selectedPeriod(o),debt:!!w?.checked});
 let seq=0,shown,busy=false;
 const upd=async()=>{const req=++seq;y.disabled=true;
 try{const q=await call('quote',params());if(req!=seq)return;
-shown=q;o.querySelector('#qa').textContent=money2(q.amt);o.querySelector('#qd').textContent=quoteDetails(q);y.textContent=q.amt==0?'Применить скидку':'Создать ссылку на оплату';y.disabled=busy||(ME.role=='client'&&!ME.qr&&q.amt>0)}
+shown=q;o.querySelector('#qa').textContent=money2(q.amt);o.querySelector('#qd').textContent=quoteDetails(q);y.textContent=q.amt==0?'Применить скидку':caption;y.disabled=busy||(ME.role=='client'&&!ME.qr&&q.amt>0)}
 catch(e){if(req==seq){o.querySelector('#qa').textContent='—';o.querySelector('#qd').textContent=e}}};
 wireSeg(o,upd);upd();if(w)w.onchange=upd;o.querySelector('[data-n]').onclick=()=>d();
 const debtBtn=o.querySelector('[data-d]');if(debtBtn)debtBtn.onclick=()=>{d();onlyDebt()};
-y.onclick=async()=>{busy=true;y.disabled=true;
-try{const r=await call('qr',{...params(),expected:shown.amt,expected_quote:shown.stamp});d();if(r.qr)await onQr(r.qr);else{toast('Скидка применена, срок оплачен');if(ME.role=='client'){ME=await api('/api/me');cui()}else await reload()}}
-catch(e){uiAlert(e);busy=false;upd()}}})}
-async function cPay(){
-const R=ME.rent;
-await qrPeriodS(R.st,R.terms,(a,b)=>api('/api/c',{a,...b}),q=>cAfter(q,'Оплата аренды'))
+y.onclick=async()=>{if(busy||y.disabled)return;busy=true;y.disabled=true;y.textContent='Подготавливаем оплату…';
+try{const r=await call('qr',{...params(),expected:shown.amt,expected_quote:shown.stamp});
+if(closed)return;
+payment=r;d()}
+catch(e){if(!closed){uiAlert(e);busy=false;upd()}}}});
+closed=true;
+try{
+    if(payment?.qr)await onQr(payment.qr);
+    else if(payment){
+        toast('Скидка применена, срок оплачен');
+        if(client){ME=await api('/api/me');cui()}else await reload()
+    }
+}catch(e){uiAlert(e)}
 }
+function cPay(){return clientPayment(async()=>{
+    const R=ME.rent;
+    await qrPeriodS(R.st,R.terms,(a,b)=>api('/api/c',{a,...b}),q=>cAfter(q,'Оплата аренды'));
+})}
 async function cReturn(){const rq=ME.rent?.return_request,t=TODAY();
 await sheet(`<h3>Возврат велосипеда</h3><p>Укажите планируемую дату. Для согласования времени свяжитесь с нами. Аренда продолжается до фактического возврата велосипеда.</p><label class=fld><span>Дата возврата</span><input id=rd type=date min="${t}" max="${addD(t,365)}" value="${rq?.date||t}"></label><label class=fld><span>Комментарий</span><textarea id=rn maxlength=200 placeholder="Например: смогу приехать вечером">${esc(rq?.note||'')}</textarea></label><button class="btn blk lg" data-y>Отправить заявку</button>${rq?'<button class="btn dng blk" data-cancel>Отменить заявку на возврат</button>':''}<button class="btn sec blk" data-n>Закрыть</button>`,(o,d)=>{o.querySelector('[data-n]').onclick=()=>d();const submit=async cancel=>{const y=o.querySelector('[data-y]');y.disabled=true;try{await api('/api/c',cancel?{a:'return_cancel'}:{a:'return_request',date:o.querySelector('#rd').value,note:o.querySelector('#rn').value});d();ME=await api('/api/me');cui();toast(cancel?'Заявка отменена':'Заявка отправлена')}catch(e){uiAlert(e)}finally{y.disabled=false}};o.querySelector('[data-y]').onclick=()=>submit(false);const cancel=o.querySelector('[data-cancel]');if(cancel)cancel.onclick=()=>submit(true)})}
 const startParam=()=>{const u=T.initDataUnsafe||{};if(u.start_param)return u.start_param;const x=(location.search+'&'+location.hash.replace(/^#/,'')).match(/tgWebAppStartParam=([^&]+)/);try{return x?decodeURIComponent(x[1]):''}catch{return ''}};
