@@ -918,7 +918,7 @@ def tochka_customers():
     return list(dict.fromkeys(x['customerCode'] for x in rows if isinstance(x,dict)
                               and x.get('customerType')=='Business'
                               and re.fullmatch(r'[A-Za-z0-9]{1,9}',str(x.get('customerCode') or ''))))
-def qr_make(amt,purpose):
+def qr_make(amt,purpose,receipt_email=None):
     t=tq()
     if not t:raise Bad('Заполните настройки интернет-эквайринга Точки.')
     if MOCK:return {'id':'mock'+nid(),'payload':'https://example.com/test-payment/'+nid(),'img':None}
@@ -928,8 +928,14 @@ def qr_make(amt,purpose):
           'purpose':purpose[:140],'paymentMode':t['modes'],'preAuthorization':False,
           'ttl':int(seconds//60),'paymentLinkId':'rent-'+nid()}
     if t.get('retailer'):data['merchantId']=t['retailer']
+    path='/acquiring/v1.0/payments'
+    if receipt_email:
+        path+='_with_receipt'
+        data['Client']={'email':receipt_email}
+        data['Items']=[{'name':'Оплата по договору аренды электровелосипеда',
+                        'amount':data['amount'],'quantity':1}]
     try:
-        operation=tochka('POST','/acquiring/v1.0/payments',{'Data':data})['Data']
+        operation=tochka('POST',path,{'Data':data})['Data']
         payload=chat_url(operation['paymentLink'])
         operation_id=operation['operationId']
         if not payload or not isinstance(operation_id,str) or not operation_id:raise ValueError('payment response')
@@ -978,7 +984,7 @@ def qr_available(r,q,on):
     if q['n']:return active and period_qr_current(r,q,on)
     if active:return q.get('dpart',0)>0 and q['amt']==dstate(r,on)['dl']
     return not q.get('dpart') and q['amt']==r.get('debt',0)
-def new_qr(rid,r,n,by,debt=False,bill=None,term=None,expected=None,expected_quote=None):
+def new_qr(rid,r,n,by,debt=False,bill=None,term=None,expected=None,expected_quote=None,receipt_email=None):
     """QR: на выставленный платёж (bill); на n периодов (+ долг, если debt); на долг активной аренды (n=0); на долг закрытой аренды.
     Сумма фиксируется на сегодня, QR действует до конца дня."""
     pe=0;dp=0;on=today();q=None
@@ -997,16 +1003,28 @@ def new_qr(rid,r,n,by,debt=False,bill=None,term=None,expected=None,expected_quot
             old=json.loads(json.dumps(r));addpay(r,n,0,0,'discount',by,term=term,discount_info=q)
             void_bills(rid,by,period_only=True);put(rid,'rent',r,'pay',by,old);return None
         raise Bad('Нечего оплачивать')
+    c=doc(r['client']) or {}
+    receipt_key=None
+    if by=='клиент':
+        email=receipt_email if receipt_email is not None else c.get('receipt_email','')
+        email=email.strip() if isinstance(email,str) else ''
+        if len(email)>254 or not re.fullmatch(r'[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+',email):
+            raise Bad('Укажите действующую почту для чека.')
+        receipt_email=email
+        receipt_key=hmac.new(TOK.encode(),email.encode(),hashlib.sha256).hexdigest()
+        if c.get('receipt_email')!=email:
+            c['receipt_email']=email
+            save(r['client'],'client',c)
     modes=sorted((tq() or {}).get('modes') or [])
     for qid,existing in kind('qr'):
         if (existing.get('payment_modes')==modes
+                and existing.get('receipt_key')==receipt_key
                 and existing['rent']==rid and existing.get('bill')==(bill[0] if bill else None)
                 and existing['n']==n and existing.get('term')==term and existing.get('dpart',0)==dp
                 and existing['amt']==amt and qr_available(r,existing,on)):
             return qid
-    c=doc(r['client']) or {}
-    m=qr_make(amt,('Аренда электровелосипеда'+(f", договор {r['contract']}" if r.get('contract') else '')+f", {c.get('name','')}").strip(', '))
-    d={'provider':'acquiring','payment_modes':modes,'rent':rid,'n':n,'amt':amt,'pen':pe,'dpart':dp,'base':paidn(r),'date':str(on),'status':'open','tid':m['id'],'payload':m['payload'],'img':m['img'],'ts':now().isoformat(timespec='seconds')}
+    m=qr_make(amt,('Аренда электровелосипеда'+(f", договор {r['contract']}" if r.get('contract') else '')+f", {c.get('name','')}").strip(', '),receipt_email)
+    d={'provider':'acquiring','receipt_key':receipt_key,'payment_modes':modes,'rent':rid,'n':n,'amt':amt,'pen':pe,'dpart':dp,'base':paidn(r),'date':str(on),'status':'open','tid':m['id'],'payload':m['payload'],'img':m['img'],'ts':now().isoformat(timespec='seconds')}
     if bill:
         d['bill']=bill[0]
         if bill[1]['kind']=='period':d['quote']=quote_stamp(term_quote(r,1,on=on))
@@ -1197,7 +1215,7 @@ def mine(cid):
     info=bot_info_data(cf)
     short_name='ИП Старчевский М.Ю.' if info['name']==BOT_INFO_DEFAULTS['name'] else info['name']
     operator={'name':short_name,'inn':info['inn'],'ogrnip':info['ogrnip'],'city':BOT_INFO_CITY}
-    return {'role':'client','today':str(t),'name':c.get('name',''),'discount':({'amt':c['discount']['amt']} if c.get('discount') else None),'rent':r,'debt':debt,'refund_due':refund_due,'cdef':cf['cdef'],'pen':charge_rate_on(t),'grace':cf['grace'],'qr':bool(tq()),'fio':c.get('name',''),'operator':operator,**contact_data(cf)}
+    return {'role':'client','today':str(t),'name':c.get('name',''),'receipt_email':c.get('receipt_email',''),'discount':({'amt':c['discount']['amt']} if c.get('discount') else None),'rent':r,'debt':debt,'refund_due':refund_due,'cdef':cf['cdef'],'pen':charge_rate_on(t),'grace':cf['grace'],'qr':bool(tq()),'fio':c.get('name',''),'operator':operator,**contact_data(cf)}
 # ---------- действия ----------
 NEED={'issue':'rent_issue','return':'rent_return','return_quote':'rent_return','refund_paid':'rent_return','waitreturn':'rent_return','rates':'rent_rates','rentnote':'rent_note',
       'price':'rent_rates','contract':'rent_contract','fix':'rent_date','seize':'seize','returnack':'rent_return',
@@ -1763,16 +1781,16 @@ def client_act(cid,b):
     if b.get('a')=='qr' and b.get('bill'):
         j,x=get('bill',b['bill'])
         if x.get('rent')!=i or x.get('status')!='open':raise Bad('Платёж уже закрыт')
-        return {'qr':new_qr(i,r,0,'клиент',bill=(j,x))}
+        return {'qr':new_qr(i,r,0,'клиент',bill=(j,x),receipt_email=b.get('receipt_email'))}
     if b.get('a')=='qr' and b.get('debtonly'):
         if not r.get('dl'):raise Bad('Долга нет')
-        return {'qr':new_qr(i,r,0,'клиент')}
+        return {'qr':new_qr(i,r,0,'клиент',receipt_email=b.get('receipt_email'))}
     if b.get('a')=='qr':
         n=integer(b.get('n',1),1,6)
         term=b.get('term') or None
         if term:n=1
         return {'qr':new_qr(i,r,n,'клиент',debt=bool(b.get('debt')),term=term,
-                            expected=b.get('expected'),expected_quote=b.get('expected_quote'))}
+                            expected=b.get('expected'),expected_quote=b.get('expected_quote'),receipt_email=b.get('receipt_email'))}
     if b.get('a')=='req':raise Bad('Заявки на отсрочку отключены.')
     raise Bad('Неизвестное действие')
 # ---------- копии ----------
