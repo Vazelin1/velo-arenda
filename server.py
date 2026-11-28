@@ -997,14 +997,16 @@ def new_qr(rid,r,n,by,debt=False,bill=None,term=None,expected=None,expected_quot
             old=json.loads(json.dumps(r));addpay(r,n,0,0,'discount',by,term=term,discount_info=q)
             void_bills(rid,by,period_only=True);put(rid,'rent',r,'pay',by,old);return None
         raise Bad('Нечего оплачивать')
+    modes=sorted((tq() or {}).get('modes') or [])
     for qid,existing in kind('qr'):
-        if (existing['rent']==rid and existing.get('bill')==(bill[0] if bill else None)
+        if (existing.get('payment_modes')==modes
+                and existing['rent']==rid and existing.get('bill')==(bill[0] if bill else None)
                 and existing['n']==n and existing.get('term')==term and existing.get('dpart',0)==dp
                 and existing['amt']==amt and qr_available(r,existing,on)):
             return qid
     c=doc(r['client']) or {}
     m=qr_make(amt,('Аренда электровелосипеда'+(f", договор {r['contract']}" if r.get('contract') else '')+f", {c.get('name','')}").strip(', '))
-    d={'provider':'acquiring','rent':rid,'n':n,'amt':amt,'pen':pe,'dpart':dp,'base':paidn(r),'date':str(on),'status':'open','tid':m['id'],'payload':m['payload'],'img':m['img'],'ts':now().isoformat(timespec='seconds')}
+    d={'provider':'acquiring','payment_modes':modes,'rent':rid,'n':n,'amt':amt,'pen':pe,'dpart':dp,'base':paidn(r),'date':str(on),'status':'open','tid':m['id'],'payload':m['payload'],'img':m['img'],'ts':now().isoformat(timespec='seconds')}
     if bill:
         d['bill']=bill[0]
         if bill[1]['kind']=='period':d['quote']=quote_stamp(term_quote(r,1,on=on))
